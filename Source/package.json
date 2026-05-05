@@ -1,0 +1,24 @@
+{
+    "name": "lens",
+    "version": "0.1.0",
+    "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
+    "private": true,
+    "scripts": {
+        "dev": "vite build --watch",
+        "build": "vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@types/chrome": "^0.0.268",
+        "@types/react": "^18.3.3",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^6.0.1",
+        "typescript": "^5.5.4",
+        "vite": "^8.0.10",
+        "vite-plugin-web-extension": "^4.5.1"
+    }
+}
