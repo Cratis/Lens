@@ -1,0 +1,6 @@
+- name: Lens Documentation
+  href: index.md
+  items:
+    - name: Getting Started
+      href: GettingStarted/toc.yml
+
