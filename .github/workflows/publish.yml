@@ -1,0 +1,259 @@
+name: Publish
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '0.0.0'
+        type: string
+      release-notes:
+        description: 'Release notes'
+        required: true
+        default: 'No release notes'
+        type: string
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+        - info
+        - warning
+        - debug
+  pull_request:
+    types: [closed]
+    branches:
+      - "**"
+    paths:
+      - "Source/**"
+
+permissions:
+  contents: write
+  deployments: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      publish: ${{ steps.release.outputs.should-publish }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Release
+        id: release
+        uses: cratis/release-action@v1
+        with:
+          version: ${{ github.event.inputs.version }}
+          release-notes: ${{ github.event.inputs.release-notes }}
+
+  build:
+    if: needs.release.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    needs: [release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23.x
+
+      - uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: |
+            .yarn/cache
+            **/node_modules
+            **/.eslintcache
+            **/yarn.lock
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+
+      - name: Yarn install
+        working-directory: ./Source
+        run: yarn
+
+      - name: Set extension version
+        working-directory: ./Source
+        run: |
+          content=$(cat manifest.json)
+          echo "${content/\"version\": \"0.0.0\"/\"version\": \"${{ needs.release.outputs.version }}\"}" > manifest.json
+
+      - name: Build
+        working-directory: ./Source
+        run: yarn build
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-dist
+          path: Source/dist/
+          retention-days: 1
+
+  publish-chrome:
+    if: needs.release.outputs.publish == 'true' && needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    needs: [release, build]
+
+    steps:
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: dist/
+
+      - name: Package extension
+        run: zip -r extension-chrome.zip dist/
+
+      - name: Publish to Chrome Web Store
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: extension-chrome.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+  publish-edge:
+    if: needs.release.outputs.publish == 'true' && needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    needs: [release, build]
+
+    steps:
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: dist/
+
+      - name: Package extension
+        run: zip -r extension-edge.zip dist/
+
+      - name: Publish to Microsoft Edge Add-ons
+        uses: wdzeng/edge-addon@v2
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          zip-path: extension-edge.zip
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+          client-secret: ${{ secrets.EDGE_CLIENT_SECRET }}
+          access-token-url: ${{ secrets.EDGE_ACCESS_TOKEN_URL }}
+
+  publish-firefox:
+    if: needs.release.outputs.publish == 'true' && needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    needs: [release, build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23.x
+
+      - uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: |
+            .yarn/cache
+            **/node_modules
+            **/.eslintcache
+            **/yarn.lock
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+
+      - name: Yarn install
+        working-directory: ./Source
+        run: yarn
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: Source/dist/
+
+      - name: Sign and publish to Firefox Add-ons (AMO)
+        working-directory: ./Source
+        run: |
+          npx web-ext sign \
+            --source-dir dist/ \
+            --artifacts-dir artifacts/ \
+            --channel listed \
+            --api-key ${{ secrets.FIREFOX_API_KEY }} \
+            --api-secret ${{ secrets.FIREFOX_API_SECRET }}
+
+  publish-safari:
+    if: needs.release.outputs.publish == 'true' && needs.release.outputs.prerelease == 'false'
+    runs-on: macos-latest
+    needs: [release, build]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23.x
+
+      - uses: actions/cache@v3
+        id: yarn-cache
+        with:
+          path: |
+            .yarn/cache
+            **/node_modules
+            **/.eslintcache
+            **/yarn.lock
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+
+      - name: Yarn install
+        working-directory: ./Source
+        run: yarn
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: Source/dist/
+
+      - name: Convert web extension to Safari extension
+        working-directory: ./Source
+        run: |
+          xcrun safari-web-extension-converter dist/ \
+            --project-location safari-extension/ \
+            --app-name "Lens" \
+            --bundle-identifier com.cratis.lens \
+            --no-open
+
+      - name: Build Safari extension
+        working-directory: ./Source/safari-extension
+        run: |
+          xcodebuild -scheme "Lens (macOS)" \
+            -configuration Release \
+            -archivePath build/Lens-macOS.xcarchive \
+            archive \
+            CODE_SIGN_IDENTITY="${{ secrets.APPLE_SIGNING_IDENTITY }}" \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
+
+      - name: Export and upload to App Store Connect
+        working-directory: ./Source/safari-extension
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/Lens-macOS.xcarchive \
+            -exportPath build/export/ \
+            -exportOptionsPlist ../ExportOptions.plist \
+            -allowProvisioningUpdates \
+            API_KEY_ID="${{ secrets.APPLE_API_KEY_ID }}" \
+            API_KEY_ISSUER_ID="${{ secrets.APPLE_API_ISSUER_ID }}"
