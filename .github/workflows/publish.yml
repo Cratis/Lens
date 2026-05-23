@@ -88,8 +88,9 @@ jobs:
       - name: Set extension version
         working-directory: ./Source
         run: |
-          content=$(cat manifest.json)
-          echo "${content/\"version\": \"0.0.0\"/\"version\": \"${{ needs.release.outputs.version }}\"}" > manifest.json
+          jq --arg version "${{ needs.release.outputs.version }}" \
+            '.version = $version' manifest.json > manifest.tmp.json && \
+            mv manifest.tmp.json manifest.json
 
       - name: Build
         working-directory: ./Source

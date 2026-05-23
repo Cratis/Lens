@@ -50,6 +50,6 @@ jobs:
         working-directory: ./Source
         run: yarn
 
-      - name: Build
+      - name: Build and verify
         working-directory: ./Source
-        run: yarn build
+        run: yarn ci
