@@ -312,9 +312,11 @@ Benchmarks/results
 .target
 **/coverage
 
-# Generated vite config (compiled from vite.config.ts)
-Source/Core/vite.config.js
-
 .playwright-mcp
 *.lscache
 *.vsix
+
+# Browser extension build output
+Source/dist/
+Source/.web-extension-artifacts/
+Source/safari-extension/
