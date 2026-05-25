@@ -119,6 +119,16 @@ body {
     min-height: 400px;
 }
 
+.warning-banner {
+    background: rgba(249, 226, 175, 0.08);
+    border: 1px solid var(--accent-yellow);
+    border-radius: var(--radius-sm);
+    color: var(--accent-yellow);
+    font-size: 13px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+}
+
 /* Cards */
 .card {
     background: var(--bg-card);
@@ -382,6 +392,8 @@ select {
 /* Arc panel */
 .arc-url-row {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
     margin-bottom: 16px;
 }

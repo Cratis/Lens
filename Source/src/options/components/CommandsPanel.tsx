@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CommandIntrospectionMetadata } from '../../shared/types';
 
 interface Props {
@@ -19,17 +19,22 @@ interface CommandState {
 }
 
 export function CommandsPanel({ arcBaseUrl }: Props) {
-    const [baseUrl, setBaseUrl] = useState(arcBaseUrl);
     const [commands, setCommands] = useState<CommandIntrospectionMetadata[] | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [fetching, setFetching] = useState(false);
     const [states, setStates] = useState<Record<string, CommandState>>({});
 
     const fetchCommands = useCallback(async () => {
+        if (!arcBaseUrl) {
+            setCommands(null);
+            setFetchError('Arc base URL unavailable. Open Lens on an Arc application page.');
+            return;
+        }
+
         setFetching(true);
         setFetchError(null);
         try {
-            const url = `${baseUrl.replace(/\/$/, '')}/.cratis/commands`;
+            const url = `${arcBaseUrl.replace(/\/$/, '')}/.cratis/commands`;
             const res = await fetch(url);
             if (!res.ok) {
                 setFetchError(`HTTP ${res.status}: ${res.statusText}`);
@@ -47,7 +52,11 @@ export function CommandsPanel({ arcBaseUrl }: Props) {
         } finally {
             setFetching(false);
         }
-    }, [baseUrl]);
+    }, [arcBaseUrl]);
+
+    useEffect(() => {
+        void fetchCommands();
+    }, [fetchCommands]);
 
     const toggleExpanded = (type: string) => {
         setStates(prev => ({
@@ -63,7 +72,7 @@ export function CommandsPanel({ arcBaseUrl }: Props) {
     const invoke = async (cmd: CommandIntrospectionMetadata) => {
         setStates(prev => ({ ...prev, [cmd.type]: { ...prev[cmd.type], loading: true, result: null } }));
         try {
-            const url = `${baseUrl.replace(/\/$/, '')}${cmd.route}`;
+            const url = `${arcBaseUrl.replace(/\/$/, '')}${cmd.route}`;
             const state = states[cmd.type];
             let bodyData: BodyInit | null = null;
             try {
@@ -104,14 +113,11 @@ export function CommandsPanel({ arcBaseUrl }: Props) {
 
             <div className="card">
                 <div className="arc-url-row">
-                    <input
-                        type="url"
-                        value={baseUrl}
-                        onChange={e => setBaseUrl(e.target.value)}
-                        placeholder="http://localhost:5000"
-                    />
-                    <button className="btn btn-primary" onClick={fetchCommands} disabled={fetching || !baseUrl}>
-                        {fetching ? 'Loading…' : 'Fetch Commands'}
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Courier New, monospace' }}>
+                        {arcBaseUrl}/.cratis/commands
+                    </div>
+                    <button className="btn btn-primary" onClick={fetchCommands} disabled={fetching || !arcBaseUrl}>
+                        {fetching ? 'Loading…' : 'Refresh'}
                     </button>
                 </div>
                 {fetchError && (
@@ -123,13 +129,13 @@ export function CommandsPanel({ arcBaseUrl }: Props) {
 
             {commands === null && !fetchError && (
                 <div className="empty-state">
-                    <p>Enter your Arc base URL and click &quot;Fetch Commands&quot; to discover available commands.</p>
+                    <p>Loading commands from Arc introspection…</p>
                 </div>
             )}
 
             {commands !== null && commands.length === 0 && (
                 <div className="empty-state">
-                    <p>No commands discovered from <code>{baseUrl}/.cratis/commands</code>.</p>
+                    <p>No commands discovered from <code>{arcBaseUrl}/.cratis/commands</code>.</p>
                 </div>
             )}
 
