@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { QueryIntrospectionMetadata } from '../../shared/types';
+import { ARC_CONTEXT_UNAVAILABLE_MESSAGE } from './arc-panel-constants';
 
 interface Props {
     arcBaseUrl: string;
@@ -40,7 +41,7 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
     const fetchQueries = useCallback(async () => {
         if (!arcBaseUrl) {
             setQueries(null);
-            setFetchError('Arc base URL unavailable. Open Lens on an Arc application page.');
+            setFetchError(ARC_CONTEXT_UNAVAILABLE_MESSAGE);
             return;
         }
 

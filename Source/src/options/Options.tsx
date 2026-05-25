@@ -26,11 +26,6 @@ export function Options() {
             .finally(() => setArcContextLoading(false));
     }, []);
 
-    useEffect(() => {
-        if (hasArcContext) return;
-        setActiveTab(current => (current === 'commands' || current === 'queries' ? 'arc' : current));
-    }, [hasArcContext]);
-
     const handleChange = async (updated: ExtensionSettings) => {
         setSettings(updated);
         await saveSettings(updated);
@@ -53,6 +48,7 @@ export function Options() {
         tabs.push({ id: 'commands', label: 'Commands' });
         tabs.push({ id: 'queries', label: 'Queries' });
     }
+    const resolvedActiveTab = tabs.some(tab => tab.id === activeTab) ? activeTab : 'users';
 
     return (
         <div className="options-root">
@@ -65,7 +61,7 @@ export function Options() {
                 {tabs.map(t => (
                     <button
                         key={t.id}
-                        className={`tab-btn ${activeTab === t.id ? 'active' : ''}`}
+                        className={`tab-btn ${resolvedActiveTab === t.id ? 'active' : ''}`}
                         onClick={() => setActiveTab(t.id)}
                     >
                         {t.label}
@@ -79,19 +75,19 @@ export function Options() {
                         This is not an Arc application. Open Lens on an Arc application page to enable Commands and Queries.
                     </div>
                 )}
-                {activeTab === 'users' && (
+                {resolvedActiveTab === 'users' && (
                     <UserList settings={settings} onChange={handleChange} />
                 )}
-                {activeTab === 'tenants' && (
+                {resolvedActiveTab === 'tenants' && (
                     <TenantList settings={settings} onChange={handleChange} />
                 )}
-                {activeTab === 'arc' && (
+                {resolvedActiveTab === 'arc' && (
                     <ArcSettings settings={settings} onChange={handleChange} arcContext={arcContext} />
                 )}
-                {activeTab === 'commands' && (
+                {resolvedActiveTab === 'commands' && hasArcContext && (
                     <CommandsPanel arcBaseUrl={arcBaseUrl} />
                 )}
-                {activeTab === 'queries' && (
+                {resolvedActiveTab === 'queries' && hasArcContext && (
                     <QueriesPanel arcBaseUrl={arcBaseUrl} />
                 )}
             </main>

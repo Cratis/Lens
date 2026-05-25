@@ -80,6 +80,8 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
 
     function getConfiguredBaseUrl(configuration: Record<string, unknown> | null, pageOrigin: string): string | null {
         if (!configuration) return null;
+        // Arc apps may expose base URL under different configuration names.
+        // We check the most explicit/common names first.
         const candidates = [
             configuration.baseUrl,
             configuration.apiBaseUrl,
@@ -125,7 +127,7 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
     const queue: object[] = isObject(fiberNode) ? [fiberNode] : [];
 
     while (queue.length > 0) {
-        const node = queue.shift() as Record<string, unknown> | undefined;
+        const node = queue.pop() as Record<string, unknown> | undefined;
         if (!node) continue;
         if (visited.has(node)) continue;
         visited.add(node);
