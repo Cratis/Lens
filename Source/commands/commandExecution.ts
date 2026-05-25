@@ -22,6 +22,24 @@ export function parseCommandExecution(raw: unknown, statusCode: number): Command
         ...(Array.isArray(maybe.errors) ? maybe.errors : []),
     ].filter(_ => typeof _ === 'string') as string[];
 
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+        messages.push(raw.trim());
+    }
+
+    if (typeof maybe.message === 'string' && maybe.message.trim().length > 0) {
+        messages.push(maybe.message.trim());
+    }
+
+    if (typeof maybe.title === 'string' && maybe.title.trim().length > 0) {
+        messages.push(maybe.title.trim());
+    }
+
+    if (typeof maybe.detail === 'string' && maybe.detail.trim().length > 0) {
+        messages.push(maybe.detail.trim());
+    }
+
+    const distinctMessages = [...new Set(messages)];
+
     const validationRaw = (Array.isArray(maybe.validationResults) ? maybe.validationResults : []) as Record<string, unknown>[];
     const validationErrors = validationRaw.map(validation => ({
         path: String(validation.property ?? validation.path ?? validation.member ?? 'n/a'),
@@ -38,7 +56,7 @@ export function parseCommandExecution(raw: unknown, statusCode: number): Command
     return {
         statusCode,
         isSuccess,
-        messages,
+        messages: distinctMessages,
         validationErrors,
         payload,
     };

@@ -183,6 +183,7 @@ export function LensPopup() {
         <div className="lens-settings-root">
             <Tooltip target=".lens-tab-button" position="right" showDelay={120} hideDelay={80} />
             <header className="options-header">
+                <img className="lens-header-logo" src="/icons/cratis-symbol-white.svg" alt="Cratis" />
                 <h1>Lens</h1>
                 <span className="header-sub">{activeTabTitle}</span>
                 {shouldShowArcStatus && (

@@ -14,6 +14,24 @@ export function parseQueryResult(raw: unknown, statusCode: number): QueryExecuti
         ...(Array.isArray(maybe.errors) ? maybe.errors : []),
     ].filter(_ => typeof _ === 'string') as string[];
 
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+        messages.push(raw.trim());
+    }
+
+    if (typeof maybe.message === 'string' && maybe.message.trim().length > 0) {
+        messages.push(maybe.message.trim());
+    }
+
+    if (typeof maybe.title === 'string' && maybe.title.trim().length > 0) {
+        messages.push(maybe.title.trim());
+    }
+
+    if (typeof maybe.detail === 'string' && maybe.detail.trim().length > 0) {
+        messages.push(maybe.detail.trim());
+    }
+
+    const distinctMessages = [...new Set(messages)];
+
     const data = (() => {
         if (Array.isArray(raw)) {
             return raw;
@@ -44,7 +62,7 @@ export function parseQueryResult(raw: unknown, statusCode: number): QueryExecuti
     return {
         statusCode,
         isSuccess,
-        messages,
+        messages: distinctMessages,
         data,
     };
 }

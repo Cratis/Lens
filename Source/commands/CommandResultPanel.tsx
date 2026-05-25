@@ -1,6 +1,5 @@
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
-import { Message } from 'primereact/message';
 import { columnsFromRows, CommandExecutionViewModel, formatCellValue, normalizeDataRows } from './commandExecution';
 
 interface Props {
@@ -10,23 +9,14 @@ interface Props {
 export function CommandResultPanel({ result }: Props) {
     const rows = normalizeDataRows(result.payload);
     const columns = columnsFromRows(rows);
+    const messageRows = result.messages.map(message => ({ message }));
+    const shouldShowValidation = result.validationErrors.length > 0;
+    const shouldShowPayload = !shouldShowValidation && result.payload !== undefined && columns.length > 0;
+    const shouldShowMessages = !shouldShowValidation && !shouldShowPayload && messageRows.length > 0;
 
     return (
         <div className="result-section">
-            <Message
-                severity={result.isSuccess ? 'success' : 'error'}
-                text={result.isSuccess
-                    ? `Command succeeded (HTTP ${result.statusCode}).`
-                    : `Command failed (HTTP ${result.statusCode}).`}
-            />
-
-            {result.messages.length > 0 && (
-                <ul className="inline-list">
-                    {result.messages.map(message => <li key={message}>{message}</li>)}
-                </ul>
-            )}
-
-            {result.validationErrors.length > 0 && (
+            {shouldShowValidation && (
                 <DataTable value={result.validationErrors} size="small" stripedRows>
                     <Column field="path" header="Field" />
                     <Column field="severity" header="Severity" />
@@ -34,7 +24,7 @@ export function CommandResultPanel({ result }: Props) {
                 </DataTable>
             )}
 
-            {result.payload !== undefined && columns.length > 0 && (
+            {shouldShowPayload && (
                 <DataTable value={rows} size="small" stripedRows>
                     {columns.map(column => (
                         <Column
@@ -44,6 +34,12 @@ export function CommandResultPanel({ result }: Props) {
                             body={row => formatCellValue(row[column])}
                         />
                     ))}
+                </DataTable>
+            )}
+
+            {shouldShowMessages && (
+                <DataTable value={messageRows} size="small" stripedRows>
+                    <Column field="message" header="Message" />
                 </DataTable>
             )}
         </div>

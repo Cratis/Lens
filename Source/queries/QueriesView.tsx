@@ -38,8 +38,15 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
     const [pathParams, setPathParams] = useState<Record<string, string>>({});
     const [performing, setPerforming] = useState(false);
     const [result, setResult] = useState<QueryExecutionViewModel | null>(null);
+    const [showResultDetails, setShowResultDetails] = useState(false);
 
     const treeNodes = useMemo<TreeNode[]>(() => buildNamespaceTree<QueryMetadata>(queries, 'pi pi-search'), [queries]);
+    const rootNodeKeys = useMemo(
+        () => treeNodes
+            .map(_ => typeof _.key === 'string' ? _.key : '')
+            .filter(_ => _.length > 0),
+        [treeNodes],
+    );
     const filteredTreeNodes = useMemo<TreeNode[]>(() => {
         const filter = filterText.trim().toLowerCase();
         if (!filter) {
@@ -72,6 +79,7 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
             setQueries(fetched);
             setSelectedQuery(null);
             setResult(null);
+            setShowResultDetails(false);
         } catch (loadError) {
             setError(String(loadError));
             setQueries([]);
@@ -93,6 +101,20 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
     useEffect(() => {
         onNavigationChanged(expandedKeys as Record<string, boolean>, selectedKey ?? '');
     }, [expandedKeys, selectedKey]);
+
+    useEffect(() => {
+        setExpandedKeys(previous => {
+            const next = { ...(previous as Record<string, boolean>) };
+            let changed = false;
+            for (const key of rootNodeKeys) {
+                if (next[key] !== true) {
+                    next[key] = true;
+                    changed = true;
+                }
+            }
+            return changed ? next : previous;
+        });
+    }, [rootNodeKeys]);
 
     const selectNode = async (selection: unknown) => {
         if (typeof selection !== 'string') {
@@ -122,6 +144,7 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
         }
         setPathParams(parameters);
         setResult(null);
+        setShowResultDetails(false);
     };
 
     const perform = async () => {
@@ -144,17 +167,29 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
                 ? await response.json()
                 : await response.text();
 
-            setResult(parseQueryResult(raw, response.status));
+            const parsed = parseQueryResult(raw, response.status);
+            setResult(parsed);
+            setShowResultDetails(parsed.isSuccess);
         } catch (performError) {
-            setResult({
+            const failedResult = {
                 statusCode: 0,
                 isSuccess: false,
                 messages: [String(performError)],
-            });
+            };
+            setResult(failedResult);
+            setShowResultDetails(false);
         } finally {
             setPerforming(false);
         }
     };
+
+    const statusState = performing
+        ? 'running'
+        : result === null
+            ? 'idle'
+            : result.isSuccess
+                ? 'success'
+                : 'failed';
 
     const renderNode = (node: TreeNode) => {
         const label = String(node.label ?? '');
@@ -187,7 +222,13 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
                     <Tree
                         value={filteredTreeNodes}
                         expandedKeys={expandedKeys}
-                        onToggle={event => setExpandedKeys(event.value)}
+                        onToggle={event => {
+                            const next = { ...(event.value as Record<string, boolean>) };
+                            for (const key of rootNodeKeys) {
+                                next[key] = true;
+                            }
+                            setExpandedKeys(next);
+                        }}
                         selectionMode="single"
                         selectionKeys={selectedKey as unknown as string}
                         onSelectionChange={event => void selectNode(event.value)}
@@ -205,9 +246,50 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
                     {selectedQuery && (
                         <div className="stack-gap">
                             <div>
-                                <h3>{selectedQuery.name}</h3>
+                                <div className="detail-header-row">
+                                    <h3>{selectedQuery.name}</h3>
+                                    <div className="detail-header-actions">
+                                        <Button
+                                            className={`result-status-button is-${statusState}`}
+                                            icon={statusState === 'running'
+                                                ? 'pi pi-spin pi-spinner'
+                                                : statusState === 'success'
+                                                    ? 'pi pi-check-circle'
+                                                    : statusState === 'failed'
+                                                        ? 'pi pi-times-circle'
+                                                        : 'pi pi-minus-circle'}
+                                            rounded
+                                            text
+                                            aria-label={statusState === 'failed' ? 'Toggle error details' : 'Query status'}
+                                            tooltip={statusState === 'running'
+                                                ? 'Performing query'
+                                                : statusState === 'success'
+                                                    ? `Query succeeded (HTTP ${result?.statusCode ?? 0})`
+                                                    : statusState === 'failed'
+                                                        ? `Query failed (HTTP ${result?.statusCode ?? 0}). Click to ${showResultDetails ? 'hide' : 'show'} details.`
+                                                        : 'No query execution yet'}
+                                            tooltipOptions={{ position: 'left' }}
+                                            onClick={() => {
+                                                if (statusState === 'failed') {
+                                                    setShowResultDetails(previous => !previous);
+                                                }
+                                            }}
+                                            disabled={statusState === 'running'}
+                                        />
+                                        <Button
+                                            className="detail-play-button"
+                                            icon={performing ? 'pi pi-spin pi-spinner' : 'pi pi-play'}
+                                            rounded
+                                            text
+                                            aria-label="Perform query"
+                                            tooltip={performing ? 'Performing query' : 'Perform query'}
+                                            tooltipOptions={{ position: 'left' }}
+                                            onClick={perform}
+                                            disabled={performing}
+                                        />
+                                    </div>
+                                </div>
                                 <p className="feature-note">{selectedQuery.documentationSummary || 'No query description available.'}</p>
-                                <div className="route-text">GET {buildResolvedUrl(arcBaseUrl, selectedQuery.route, pathParams)}</div>
                             </div>
 
                             {extractPathParams(selectedQuery.route).length > 0 && (
@@ -225,11 +307,7 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
                                 </div>
                             )}
 
-                            <div className="action-row">
-                                <Button label={performing ? 'Performing...' : 'Perform'} icon="pi pi-search" onClick={perform} disabled={performing} />
-                            </div>
-
-                            {result && (
+                            {result && showResultDetails && (
                                 <QueryResultPanel result={result} />
                             )}
                         </div>

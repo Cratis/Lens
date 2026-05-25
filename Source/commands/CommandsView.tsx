@@ -38,8 +38,15 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
     const [requestBody, setRequestBody] = useState<Record<string, unknown>>({});
     const [executing, setExecuting] = useState(false);
     const [result, setResult] = useState<CommandExecutionViewModel | null>(null);
+    const [showResultDetails, setShowResultDetails] = useState(false);
 
     const treeNodes = useMemo<TreeNode[]>(() => buildNamespaceTree<CommandMetadata>(commands, 'pi pi-play-circle'), [commands]);
+    const rootNodeKeys = useMemo(
+        () => treeNodes
+            .map(_ => typeof _.key === 'string' ? _.key : '')
+            .filter(_ => _.length > 0),
+        [treeNodes],
+    );
     const filteredTreeNodes = useMemo<TreeNode[]>(() => {
         const filter = filterText.trim().toLowerCase();
         if (!filter) {
@@ -72,6 +79,7 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
             setCommands(fetched);
             setSelectedCommand(null);
             setResult(null);
+            setShowResultDetails(false);
         } catch (loadError) {
             setError(String(loadError));
             setCommands([]);
@@ -93,6 +101,20 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
     useEffect(() => {
         onNavigationChanged(expandedKeys as Record<string, boolean>, selectedKey ?? '');
     }, [expandedKeys, selectedKey]);
+
+    useEffect(() => {
+        setExpandedKeys(previous => {
+            const next = { ...(previous as Record<string, boolean>) };
+            let changed = false;
+            for (const key of rootNodeKeys) {
+                if (next[key] !== true) {
+                    next[key] = true;
+                    changed = true;
+                }
+            }
+            return changed ? next : previous;
+        });
+    }, [rootNodeKeys]);
 
     const selectNode = async (selection: unknown) => {
         if (typeof selection !== 'string') {
@@ -121,6 +143,7 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
             ? initialBody as Record<string, unknown>
             : {});
         setResult(null);
+        setShowResultDetails(false);
     };
 
     const execute = async () => {
@@ -148,18 +171,30 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
                 ? await response.json()
                 : await response.text();
 
-            setResult(parseCommandExecution(rawResult, response.status));
+            const parsed = parseCommandExecution(rawResult, response.status);
+            setResult(parsed);
+            setShowResultDetails(parsed.isSuccess);
         } catch (executionError) {
-            setResult({
+            const failedResult = {
                 statusCode: 0,
                 isSuccess: false,
                 messages: [String(executionError)],
                 validationErrors: [],
-            });
+            };
+            setResult(failedResult);
+            setShowResultDetails(false);
         } finally {
             setExecuting(false);
         }
     };
+
+    const statusState = executing
+        ? 'running'
+        : result === null
+            ? 'idle'
+            : result.isSuccess
+                ? 'success'
+                : 'failed';
 
     const renderNode = (node: TreeNode) => {
         const label = String(node.label ?? '');
@@ -192,7 +227,13 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
                     <Tree
                         value={filteredTreeNodes}
                         expandedKeys={expandedKeys}
-                        onToggle={event => setExpandedKeys(event.value)}
+                        onToggle={event => {
+                            const next = { ...(event.value as Record<string, boolean>) };
+                            for (const key of rootNodeKeys) {
+                                next[key] = true;
+                            }
+                            setExpandedKeys(next);
+                        }}
                         selectionMode="single"
                         selectionKeys={selectedKey as unknown as string}
                         onSelectionChange={event => void selectNode(event.value)}
@@ -210,9 +251,50 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
                     {selectedCommand && (
                         <div className="stack-gap">
                             <div>
-                                <h3>{selectedCommand.name}</h3>
+                                <div className="detail-header-row">
+                                    <h3>{selectedCommand.name}</h3>
+                                    <div className="detail-header-actions">
+                                        <Button
+                                            className={`result-status-button is-${statusState}`}
+                                            icon={statusState === 'running'
+                                                ? 'pi pi-spin pi-spinner'
+                                                : statusState === 'success'
+                                                    ? 'pi pi-check-circle'
+                                                    : statusState === 'failed'
+                                                        ? 'pi pi-times-circle'
+                                                        : 'pi pi-minus-circle'}
+                                            rounded
+                                            text
+                                            aria-label={statusState === 'failed' ? 'Toggle error details' : 'Execution status'}
+                                            tooltip={statusState === 'running'
+                                                ? 'Executing command'
+                                                : statusState === 'success'
+                                                    ? `Command succeeded (HTTP ${result?.statusCode ?? 0})`
+                                                    : statusState === 'failed'
+                                                        ? `Command failed (HTTP ${result?.statusCode ?? 0}). Click to ${showResultDetails ? 'hide' : 'show'} details.`
+                                                        : 'No command execution yet'}
+                                            tooltipOptions={{ position: 'left' }}
+                                            onClick={() => {
+                                                if (statusState === 'failed') {
+                                                    setShowResultDetails(previous => !previous);
+                                                }
+                                            }}
+                                            disabled={statusState === 'running'}
+                                        />
+                                        <Button
+                                            className="detail-play-button"
+                                            icon={executing ? 'pi pi-spin pi-spinner' : 'pi pi-play'}
+                                            rounded
+                                            text
+                                            aria-label="Execute command"
+                                            tooltip={executing ? 'Executing command' : 'Execute command'}
+                                            tooltipOptions={{ position: 'left' }}
+                                            onClick={execute}
+                                            disabled={executing}
+                                        />
+                                    </div>
+                                </div>
                                 <p className="feature-note">{selectedCommand.documentationSummary || 'No command description available.'}</p>
-                                <div className="route-text">POST {selectedCommand.route}</div>
                             </div>
 
                             {selectedCommand.schema && (
@@ -233,11 +315,7 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
                                 </div>
                             )}
 
-                            <div className="action-row">
-                                <Button label={executing ? 'Executing...' : 'Execute'} icon="pi pi-play" onClick={execute} disabled={executing} />
-                            </div>
-
-                            {result && (
+                            {result && showResultDetails && (
                                 <CommandResultPanel result={result} />
                             )}
                         </div>

@@ -108,6 +108,13 @@ p {
     color: var(--text-color);
 }
 
+.lens-header-logo {
+    width: 2.7rem;
+    height: 2.7rem;
+    display: block;
+    flex: 0 0 auto;
+}
+
 .header-sub {
     color: var(--text-color-secondary);
     font-size: 0.875rem;
@@ -517,7 +524,7 @@ p {
 }
 
 .tree-panel .p-tree-container {
-    padding: 0.0625rem 0.0625rem 0.1875rem;
+    padding: 0;
 }
 
 .tree-panel .p-tree .p-treenode {
@@ -525,22 +532,27 @@ p {
 }
 
 .tree-panel .p-tree .p-treenode-content {
-    padding: 0.09rem 0.125rem;
-    gap: 0.09rem;
+    padding: 0.14rem 0.2rem;
+    gap: 0.14rem;
+    width: 100%;
 }
 
 .tree-panel .p-tree .p-treenode-children {
-    padding-left: 0.3rem;
+    padding-left: 0.24rem;
 }
 
 .tree-panel .p-tree .p-tree-toggler {
     width: 1rem;
     height: 1rem;
-    margin-right: 0.05rem;
+    margin-right: 0.03rem;
 }
 
 .tree-panel .p-tree .p-treenode-icon {
-    margin-right: 0.1rem;
+    margin-right: 0.08rem;
+}
+
+.tree-panel .p-tree-container > .p-treenode > .p-treenode-content .p-tree-toggler {
+    display: none;
 }
 
 .tree-node-label {
@@ -596,19 +608,52 @@ p {
     overflow-x: hidden;
 }
 
-.route-text {
-    margin-top: 0.5rem;
-    padding: 0.3rem 0.55rem;
-    border: 1px solid var(--surface-border);
-    background: var(--surface-50);
-    border-radius: 6px;
+.detail-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.detail-header-row h3 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.detail-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.detail-play-button.p-button,
+.result-status-button.p-button {
+    width: 2rem;
+    height: 2rem;
+}
+
+.result-status-button.p-button.is-idle {
     color: var(--text-color-secondary);
-    font-family: monospace;
-    font-size: 0.8rem;
-    display: block;
-    max-width: 100%;
-    white-space: normal;
-    overflow-wrap: anywhere;
+}
+
+.result-status-button.p-button.is-success {
+    color: var(--green-500);
+}
+
+.result-status-button.p-button.is-failed {
+    color: var(--red-500);
+}
+
+.result-status-button.p-button.is-running {
+    color: var(--primary-color);
+}
+
+.route-text {
+    display: none;
 }
 
 .commands-view .p-button,
