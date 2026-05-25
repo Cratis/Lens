@@ -15,6 +15,9 @@ interface ArcContextDetectionResult {
     configuration: Record<string, unknown> | null;
 }
 
+const MAX_SANITIZATION_DEPTH = 6;
+const ARC_CONTEXT_MARKER_PROPERTY = 'reconnectQueries';
+
 function getOrigin(url: string | undefined): string | null {
     if (!url) return null;
     try {
@@ -46,7 +49,7 @@ function createNonArcSnapshot(pageOrigin: string | null): ArcContextSnapshot {
 
 function detectArcContextFromPage(): ArcContextDetectionResult {
     function sanitize(value: unknown, depth = 0): unknown {
-        if (depth > 6) return null;
+        if (depth > MAX_SANITIZATION_DEPTH) return null;
         if (value === null || value === undefined) return value;
         if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
         if (Array.isArray(value)) return value.map(item => sanitize(item, depth + 1));
@@ -113,12 +116,13 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         };
     }
 
-    const visited = new Set<unknown>();
+    const visited = new Set<object>();
     const queue: unknown[] = [(root as unknown as Record<string, unknown>)[fiberKey]];
 
     while (queue.length > 0) {
         const node = queue.shift() as Record<string, unknown> | undefined;
-        if (!node || visited.has(node)) continue;
+        if (!node) continue;
+        if (visited.has(node)) continue;
         visited.add(node);
 
         const memoizedProps = node.memoizedProps as Record<string, unknown> | undefined;
@@ -127,7 +131,7 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         if (
             contextValue &&
             typeof contextValue === 'object' &&
-            'reconnectQueries' in (contextValue as Record<string, unknown>)
+            ARC_CONTEXT_MARKER_PROPERTY in (contextValue as Record<string, unknown>)
         ) {
             const context = contextValue as Record<string, unknown>;
             const configuration = sanitize(context.configuration) as Record<string, unknown> | null;
