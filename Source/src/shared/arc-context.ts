@@ -175,6 +175,7 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
     try {
         const [executionResult] = await chrome.scripting.executeScript({
             target: { tabId: activeTab.id },
+            // Arc context is exposed on page-owned React fiber nodes, so this needs page-world access.
             world: 'MAIN',
             func: detectArcContextFromPage,
         });

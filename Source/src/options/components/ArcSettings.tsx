@@ -27,7 +27,7 @@ export function ArcSettings({ settings, onChange, arcContext }: Props) {
                 {arcContext?.isArcApplication && arcContext.baseUrl ? (
                     <>
                         <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                            Commands and queries use Arc context detected from the current page.
+                            Commands and Queries use Arc context detected from the current page.
                         </p>
                         <div style={{ fontSize: 12, marginTop: 8, fontFamily: 'Courier New, monospace', color: 'var(--accent)' }}>
                             {arcContext.baseUrl}

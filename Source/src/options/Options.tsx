@@ -17,6 +17,7 @@ export function Options() {
     const [arcContextLoading, setArcContextLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>('users');
     const [saved, setSaved] = useState(false);
+    const hasArcContext = arcContext?.isArcApplication === true;
 
     useEffect(() => {
         getSettings().then(setSettings);
@@ -26,11 +27,9 @@ export function Options() {
     }, []);
 
     useEffect(() => {
-        const arcAvailable = arcContext?.isArcApplication === true;
-        if (!arcAvailable && (activeTab === 'commands' || activeTab === 'queries')) {
-            setActiveTab('arc');
-        }
-    }, [arcContext, activeTab]);
+        if (hasArcContext) return;
+        setActiveTab(current => (current === 'commands' || current === 'queries' ? 'arc' : current));
+    }, [hasArcContext]);
 
     const handleChange = async (updated: ExtensionSettings) => {
         setSettings(updated);
@@ -43,7 +42,6 @@ export function Options() {
         return <div className="loading">Loading settings…</div>;
     }
 
-    const hasArcContext = arcContext?.isArcApplication === true;
     const arcBaseUrl = arcContext?.baseUrl ?? '';
 
     const tabs: { id: Tab; label: string }[] = [
