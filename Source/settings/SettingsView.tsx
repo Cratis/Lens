@@ -16,7 +16,7 @@ export function SettingsView({ settings, onChange }: Props) {
     return (
         <div className="stack-gap page-layout">
             <section className="feature-card fill-widget">
-                <TabView>
+                <TabView className="sticky-tab-composition">
                     <TabPanel header="User settings">
                         <UserList settings={settings} onChange={onChange} />
                     </TabPanel>
