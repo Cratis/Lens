@@ -5,6 +5,7 @@
     "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
     "permissions": [
         "storage",
+        "scripting",
         "declarativeNetRequest",
         "declarativeNetRequestWithHostAccess"
     ],

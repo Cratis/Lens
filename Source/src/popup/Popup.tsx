@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ExtensionSettings, UserProfile, Tenant } from '../shared/types';
 import { getSettings, saveSettings, getActiveUser, getActiveTenant } from '../shared/storage';
+import { captureArcContextForActiveTab, saveArcContextSnapshot } from '../shared/arc-context';
 import './popup.css';
 
 export function Popup() {
@@ -8,6 +9,12 @@ export function Popup() {
 
     useEffect(() => {
         getSettings().then(setSettings);
+    }, []);
+
+    useEffect(() => {
+        captureArcContextForActiveTab()
+            .then(saveArcContextSnapshot)
+            .catch(() => undefined);
     }, []);
 
     const selectUser = useCallback(async (userId: string) => {

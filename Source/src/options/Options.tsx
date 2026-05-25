@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ExtensionSettings } from '../shared/types';
 import { getSettings, saveSettings } from '../shared/storage';
+import { ArcContextSnapshot, getArcContextSnapshot } from '../shared/arc-context';
 import { UserList } from './components/UserList';
 import { TenantList } from './components/TenantList';
 import { ArcSettings } from './components/ArcSettings';
@@ -12,11 +13,17 @@ type Tab = 'users' | 'tenants' | 'arc' | 'commands' | 'queries';
 
 export function Options() {
     const [settings, setSettings] = useState<ExtensionSettings | null>(null);
+    const [arcContext, setArcContext] = useState<ArcContextSnapshot | null>(null);
+    const [arcContextLoading, setArcContextLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>('users');
     const [saved, setSaved] = useState(false);
+    const hasArcContext = arcContext?.isArcApplication === true;
 
     useEffect(() => {
         getSettings().then(setSettings);
+        getArcContextSnapshot()
+            .then(setArcContext)
+            .finally(() => setArcContextLoading(false));
     }, []);
 
     const handleChange = async (updated: ExtensionSettings) => {
@@ -30,13 +37,18 @@ export function Options() {
         return <div className="loading">Loading settings…</div>;
     }
 
+    const arcBaseUrl = arcContext?.baseUrl ?? '';
+
     const tabs: { id: Tab; label: string }[] = [
         { id: 'users', label: 'Users' },
         { id: 'tenants', label: 'Tenants' },
         { id: 'arc', label: 'Arc Settings' },
-        { id: 'commands', label: 'Commands' },
-        { id: 'queries', label: 'Queries' },
     ];
+    if (hasArcContext) {
+        tabs.push({ id: 'commands', label: 'Commands' });
+        tabs.push({ id: 'queries', label: 'Queries' });
+    }
+    const resolvedActiveTab = tabs.some(tab => tab.id === activeTab) ? activeTab : 'users';
 
     return (
         <div className="options-root">
@@ -49,7 +61,7 @@ export function Options() {
                 {tabs.map(t => (
                     <button
                         key={t.id}
-                        className={`tab-btn ${activeTab === t.id ? 'active' : ''}`}
+                        className={`tab-btn ${resolvedActiveTab === t.id ? 'active' : ''}`}
                         onClick={() => setActiveTab(t.id)}
                     >
                         {t.label}
@@ -58,20 +70,25 @@ export function Options() {
             </nav>
 
             <main className="options-main">
-                {activeTab === 'users' && (
+                {!arcContextLoading && !hasArcContext && (
+                    <div className="warning-banner">
+                        This is not an Arc application. Open Lens on an Arc application page to enable Commands and Queries.
+                    </div>
+                )}
+                {resolvedActiveTab === 'users' && (
                     <UserList settings={settings} onChange={handleChange} />
                 )}
-                {activeTab === 'tenants' && (
+                {resolvedActiveTab === 'tenants' && (
                     <TenantList settings={settings} onChange={handleChange} />
                 )}
-                {activeTab === 'arc' && (
-                    <ArcSettings settings={settings} onChange={handleChange} />
+                {resolvedActiveTab === 'arc' && (
+                    <ArcSettings settings={settings} onChange={handleChange} arcContext={arcContext} />
                 )}
-                {activeTab === 'commands' && (
-                    <CommandsPanel arcBaseUrl={settings.arcBaseUrl} />
+                {resolvedActiveTab === 'commands' && hasArcContext && (
+                    <CommandsPanel arcBaseUrl={arcBaseUrl} />
                 )}
-                {activeTab === 'queries' && (
-                    <QueriesPanel arcBaseUrl={settings.arcBaseUrl} />
+                {resolvedActiveTab === 'queries' && hasArcContext && (
+                    <QueriesPanel arcBaseUrl={arcBaseUrl} />
                 )}
             </main>
         </div>

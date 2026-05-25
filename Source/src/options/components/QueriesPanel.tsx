@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { QueryIntrospectionMetadata } from '../../shared/types';
+import { ARC_CONTEXT_UNAVAILABLE_MESSAGE } from './arc-panel-constants';
 
 interface Props {
     arcBaseUrl: string;
@@ -32,17 +33,22 @@ function buildUrl(baseUrl: string, route: string, params: Record<string, string>
 }
 
 export function QueriesPanel({ arcBaseUrl }: Props) {
-    const [baseUrl, setBaseUrl] = useState(arcBaseUrl);
     const [queries, setQueries] = useState<QueryIntrospectionMetadata[] | null>(null);
     const [fetchError, setFetchError] = useState<string | null>(null);
     const [fetching, setFetching] = useState(false);
     const [states, setStates] = useState<Record<string, QueryState>>({});
 
     const fetchQueries = useCallback(async () => {
+        if (!arcBaseUrl) {
+            setQueries(null);
+            setFetchError(ARC_CONTEXT_UNAVAILABLE_MESSAGE);
+            return;
+        }
+
         setFetching(true);
         setFetchError(null);
         try {
-            const url = `${baseUrl.replace(/\/$/, '')}/.cratis/queries`;
+            const url = `${arcBaseUrl.replace(/\/$/, '')}/.cratis/queries`;
             const res = await fetch(url);
             if (!res.ok) {
                 setFetchError(`HTTP ${res.status}: ${res.statusText}`);
@@ -63,7 +69,11 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
         } finally {
             setFetching(false);
         }
-    }, [baseUrl]);
+    }, [arcBaseUrl]);
+
+    useEffect(() => {
+        void fetchQueries();
+    }, [fetchQueries]);
 
     const toggleExpanded = (type: string) => {
         setStates(prev => ({
@@ -83,7 +93,7 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
         setStates(prev => ({ ...prev, [query.type]: { ...prev[query.type], loading: true, result: null } }));
         try {
             const state = states[query.type];
-            const url = buildUrl(baseUrl, query.route, state.params);
+            const url = buildUrl(arcBaseUrl, query.route, state.params);
             const res = await fetch(url, { method: 'GET' });
             let body = '';
             const contentType = res.headers.get('content-type') ?? '';
@@ -112,14 +122,11 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
 
             <div className="card">
                 <div className="arc-url-row">
-                    <input
-                        type="url"
-                        value={baseUrl}
-                        onChange={e => setBaseUrl(e.target.value)}
-                        placeholder="http://localhost:5000"
-                    />
-                    <button className="btn btn-primary" onClick={fetchQueries} disabled={fetching || !baseUrl}>
-                        {fetching ? 'Loading…' : 'Fetch Queries'}
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'Courier New, monospace' }}>
+                        {arcBaseUrl}/.cratis/queries
+                    </div>
+                    <button className="btn btn-primary" onClick={fetchQueries} disabled={fetching || !arcBaseUrl}>
+                        {fetching ? 'Loading…' : 'Refresh'}
                     </button>
                 </div>
                 {fetchError && (
@@ -131,13 +138,13 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
 
             {queries === null && !fetchError && (
                 <div className="empty-state">
-                    <p>Enter your Arc base URL and click &quot;Fetch Queries&quot; to discover available queries.</p>
+                    <p>Loading queries from Arc introspection…</p>
                 </div>
             )}
 
             {queries !== null && queries.length === 0 && (
                 <div className="empty-state">
-                    <p>No queries discovered from <code>{baseUrl}/.cratis/queries</code>.</p>
+                    <p>No queries discovered from <code>{arcBaseUrl}/.cratis/queries</code>.</p>
                 </div>
             )}
 
@@ -146,7 +153,7 @@ export function QueriesPanel({ arcBaseUrl }: Props) {
                     {queries.map(query => {
                         const state = states[query.type] ?? { expanded: false, params: {}, result: null, loading: false };
                         const paramNames = extractPathParams(query.route);
-                        const finalUrl = buildUrl(baseUrl, query.route, state.params);
+                        const finalUrl = buildUrl(arcBaseUrl, query.route, state.params);
 
                         return (
                             <div className="endpoint-card" key={query.type}>

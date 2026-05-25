@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ExtensionSettings } from '../../shared/types';
+import { ArcContextSnapshot } from '../../shared/arc-context';
 
 interface Props {
     settings: ExtensionSettings;
     onChange: (settings: ExtensionSettings) => void;
+    arcContext: ArcContextSnapshot | null;
 }
 
-export function ArcSettings({ settings, onChange }: Props) {
+export function ArcSettings({ settings, onChange, arcContext }: Props) {
     const [arcBaseUrl, setArcBaseUrl] = useState(settings.arcBaseUrl);
     const [tenantHeaderName, setTenantHeaderName] = useState(settings.tenantHeaderName);
 
@@ -22,9 +24,23 @@ export function ArcSettings({ settings, onChange }: Props) {
 
             <div className="card">
                 <div className="card-title">Connection</div>
+                {arcContext?.isArcApplication && arcContext.baseUrl ? (
+                    <>
+                        <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                            Commands and Queries use Arc context detected from the current page.
+                        </p>
+                        <div style={{ fontSize: 12, marginTop: 8, fontFamily: 'Courier New, monospace', color: 'var(--accent)' }}>
+                            {arcContext.baseUrl}
+                        </div>
+                    </>
+                ) : (
+                    <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                        Arc context is unavailable for the current page. Commands and Queries are hidden until Lens is opened on an Arc application page.
+                    </p>
+                )}
 
-                <div className="form-row">
-                    <label>Arc Base URL</label>
+                <div className="form-row" style={{ marginTop: 16 }}>
+                    <label>Arc Base URL (Header Injection Scope)</label>
                     <input
                         type="url"
                         value={arcBaseUrl}
@@ -32,7 +48,7 @@ export function ArcSettings({ settings, onChange }: Props) {
                         placeholder="http://localhost:5000"
                     />
                     <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-                        The base URL of your Arc application. Used to fetch introspection data and to scope header injection.
+                        Optional scope used for request header injection rules.
                     </p>
                 </div>
             </div>

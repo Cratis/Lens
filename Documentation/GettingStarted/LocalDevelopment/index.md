@@ -39,14 +39,15 @@ This generates `Source/dist/`, including `manifest.json`.
 
 The **Lens - Cratis Developer Tools** extension should now appear in your extension list.
 
-## 4. Set up Arc connection
+## 4. Open Lens on an Arc application page
 
-1. Open the extension options page from the extension details.
-2. Set **Arc Base URL** to your local Arc host, for example `http://localhost:5000`.
-3. Keep the default **Tenant Header Name** unless your app expects a different header.
-4. Select **Save Settings**.
+1. Navigate to your Arc application in Chrome.
+2. Open the Lens extension popup once on that page so Lens can detect Arc context.
+3. Open the extension options page from the extension details.
+4. Keep the default **Tenant Header Name** unless your app expects a different header.
+5. Select **Save Settings**.
 
-Lens can now fetch command and query introspection metadata from your Arc application.
+Lens now uses the detected Arc context and current page location for command and query introspection.
 
 ## 5. Use watch mode while developing
 
@@ -57,4 +58,3 @@ npm run dev
 ```
 
 Vite rebuilds the extension when you change source files. Reload the extension in `chrome://extensions` after each rebuild.
-
