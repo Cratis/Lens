@@ -161,6 +161,11 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
         }
     };
 
+    const renderNode = (node: TreeNode) => {
+        const label = String(node.label ?? '');
+        return <span className="tree-node-label" title={label}>{label}</span>;
+    };
+
     return (
         <div className="stack-gap page-layout commands-view">
             {error && <Message severity="error" text={error} />}
@@ -191,6 +196,7 @@ export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, pers
                         selectionMode="single"
                         selectionKeys={selectedKey as unknown as string}
                         onSelectionChange={event => void selectNode(event.value)}
+                        nodeTemplate={renderNode}
                     />
                 </div>
 

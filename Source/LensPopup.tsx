@@ -113,12 +113,6 @@ export function LensPopup() {
             tooltip: 'Current values: choose active user and tenant for this browser profile.',
         },
         {
-            id: 'settings',
-            label: 'Settings',
-            iconClass: 'pi-cog',
-            tooltip: 'Manage user and tenant settings used by Lens context selection.',
-        },
-        {
             id: 'commands',
             label: 'Commands',
             iconClass: 'pi-play-circle',
@@ -135,6 +129,12 @@ export function LensPopup() {
                 ? 'Queries: browse queries by namespace and perform them with tabular results.'
                 : 'Queries are available only when the active tab is an Arc application.',
             disabled: !hasArcContext,
+        },
+        {
+            id: 'settings',
+            label: 'Settings',
+            iconClass: 'pi-cog',
+            tooltip: 'Manage user and tenant settings used by Lens context selection.',
         },
     ]), [hasArcContext]);
 
@@ -207,7 +207,7 @@ export function LensPopup() {
                     {tabs.map(tab => (
                         <Button
                             key={tab.id}
-                            className={`lens-tab-button ${resolvedActiveTab === tab.id ? 'is-active' : ''}`}
+                            className={`lens-tab-button ${tab.id === 'settings' ? 'is-settings-tab' : ''} ${resolvedActiveTab === tab.id ? 'is-active' : ''}`}
                             rounded
                             text
                             aria-label={tab.label}

@@ -156,6 +156,11 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
         }
     };
 
+    const renderNode = (node: TreeNode) => {
+        const label = String(node.label ?? '');
+        return <span className="tree-node-label" title={label}>{label}</span>;
+    };
+
     return (
         <div className="stack-gap page-layout queries-view">
             {error && <Message severity="error" text={error} />}
@@ -186,6 +191,7 @@ export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persi
                         selectionMode="single"
                         selectionKeys={selectedKey as unknown as string}
                         onSelectionChange={event => void selectNode(event.value)}
+                        nodeTemplate={renderNode}
                     />
                 </div>
 
