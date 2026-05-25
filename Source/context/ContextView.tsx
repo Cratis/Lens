@@ -15,7 +15,7 @@ export function ContextView({ settings, onChange }: Props) {
     const activeTenant = settings.tenants.find(_ => _.id === settings.activeTenantId);
 
     return (
-        <div className="stack-gap">
+        <div className="stack-gap page-layout">
             <section className="feature-card">
                 <div className="form-grid two-col">
                     <div className="field-block">
@@ -50,7 +50,7 @@ export function ContextView({ settings, onChange }: Props) {
                 </div>
             </section>
 
-            <section className="feature-card">
+            <section className="feature-card fill-widget">
                 <div className="context-grid">
                     <div>
                         <div className="context-label">User</div>

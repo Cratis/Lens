@@ -5,6 +5,8 @@ import { Message } from 'primereact/message';
 import { Tree, TreeExpandedKeysType } from 'primereact/tree';
 import { TreeNode } from 'primereact/treenode';
 import { ARC_CONTEXT_UNAVAILABLE_MESSAGE } from '../arc/constants';
+import { buildContextRequestHeaders } from '../shared/requestHeaders';
+import { ExtensionSettings } from '../shared/types';
 import {
     buildNamespaceTree,
     CommandMetadata,
@@ -19,12 +21,13 @@ import { CommandExecutionViewModel, parseCommandExecution } from './commandExecu
 
 interface Props {
     arcBaseUrl: string;
+    settings: ExtensionSettings | null;
     persistedExpandedKeys: Record<string, boolean>;
     persistedSelectedKey: string;
     onNavigationChanged: (expandedKeys: Record<string, boolean>, selectedKey: string) => void;
 }
 
-export function CommandsView({ arcBaseUrl, persistedExpandedKeys, persistedSelectedKey, onNavigationChanged }: Props) {
+export function CommandsView({ arcBaseUrl, settings, persistedExpandedKeys, persistedSelectedKey, onNavigationChanged }: Props) {
     const [commands, setCommands] = useState<CommandMetadata[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -135,6 +138,7 @@ export function CommandsView({ arcBaseUrl, persistedExpandedKeys, persistedSelec
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    ...buildContextRequestHeaders(settings),
                 },
                 body: JSON.stringify(body),
             });
@@ -158,10 +162,10 @@ export function CommandsView({ arcBaseUrl, persistedExpandedKeys, persistedSelec
     };
 
     return (
-        <div className="stack-gap commands-view">
+        <div className="stack-gap page-layout commands-view">
             {error && <Message severity="error" text={error} />}
 
-            <section className="split-layout">
+            <section className="split-layout fill-widget">
                 <div className="tree-panel">
                     <div className="tree-toolbar">
                         <Button

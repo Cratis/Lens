@@ -232,6 +232,7 @@ export function LensPopup() {
                     {resolvedActiveTab === 'commands' && hasArcContext && (
                         <CommandsView
                             arcBaseUrl={arcBaseUrl}
+                            settings={settings}
                             persistedExpandedKeys={commandsExpandedKeys}
                             persistedSelectedKey={commandsSelectedKey}
                             onNavigationChanged={(expandedKeys, selectedKey) => {
@@ -248,6 +249,7 @@ export function LensPopup() {
                     {resolvedActiveTab === 'queries' && hasArcContext && (
                         <QueriesView
                             arcBaseUrl={arcBaseUrl}
+                            settings={settings}
                             persistedExpandedKeys={queriesExpandedKeys}
                             persistedSelectedKey={queriesSelectedKey}
                             onNavigationChanged={(expandedKeys, selectedKey) => {

@@ -16,15 +16,18 @@ import { findNodeByKey } from '../arc/tree';
 import { QueryResultPanel } from './QueryResultPanel';
 import { parseQueryResult, QueryExecutionViewModel } from './queryExecution';
 import { buildResolvedUrl, extractPathParams } from './queryRoute';
+import { buildContextRequestHeaders } from '../shared/requestHeaders';
+import { ExtensionSettings } from '../shared/types';
 
 interface Props {
     arcBaseUrl: string;
+    settings: ExtensionSettings | null;
     persistedExpandedKeys: Record<string, boolean>;
     persistedSelectedKey: string;
     onNavigationChanged: (expandedKeys: Record<string, boolean>, selectedKey: string) => void;
 }
 
-export function QueriesView({ arcBaseUrl, persistedExpandedKeys, persistedSelectedKey, onNavigationChanged }: Props) {
+export function QueriesView({ arcBaseUrl, settings, persistedExpandedKeys, persistedSelectedKey, onNavigationChanged }: Props) {
     const [queries, setQueries] = useState<QueryMetadata[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -130,7 +133,12 @@ export function QueriesView({ arcBaseUrl, persistedExpandedKeys, persistedSelect
         setPerforming(true);
         setResult(null);
         try {
-            const response = await fetch(endpoint, { method: 'GET' });
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    ...buildContextRequestHeaders(settings),
+                },
+            });
             const contentType = response.headers.get('content-type') ?? '';
             const raw = contentType.includes('application/json')
                 ? await response.json()
@@ -149,10 +157,10 @@ export function QueriesView({ arcBaseUrl, persistedExpandedKeys, persistedSelect
     };
 
     return (
-        <div className="stack-gap queries-view">
+        <div className="stack-gap page-layout queries-view">
             {error && <Message severity="error" text={error} />}
 
-            <section className="split-layout">
+            <section className="split-layout fill-widget">
                 <div className="tree-panel">
                     <div className="tree-toolbar">
                         <Button
