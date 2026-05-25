@@ -18,6 +18,10 @@ interface ArcContextDetectionResult {
 const MAX_SANITIZATION_DEPTH = 6;
 const ARC_CONTEXT_MARKER_PROPERTY = 'reconnectQueries';
 
+function isObject(value: unknown): value is object {
+    return typeof value === 'object' && value !== null;
+}
+
 function getOrigin(url: string | undefined): string | null {
     if (!url) return null;
     try {
@@ -116,8 +120,9 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         };
     }
 
-    const visited = new Set<object>();
-    const queue: unknown[] = [(root as unknown as Record<string, unknown>)[fiberKey]];
+    const visited = new WeakSet<object>();
+    const fiberNode = (root as unknown as Record<string, unknown>)[fiberKey];
+    const queue: object[] = isObject(fiberNode) ? [fiberNode] : [];
 
     while (queue.length > 0) {
         const node = queue.shift() as Record<string, unknown> | undefined;
@@ -148,9 +153,9 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         const child = node.child;
         const sibling = node.sibling;
         const parent = node.return;
-        if (child && !visited.has(child)) queue.push(child);
-        if (sibling && !visited.has(sibling)) queue.push(sibling);
-        if (parent && !visited.has(parent)) queue.push(parent);
+        if (isObject(child) && !visited.has(child)) queue.push(child);
+        if (isObject(sibling) && !visited.has(sibling)) queue.push(sibling);
+        if (isObject(parent) && !visited.has(parent)) queue.push(parent);
     }
 
     return {
