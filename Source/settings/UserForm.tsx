@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
@@ -38,6 +38,8 @@ export function UserForm({ user, onSave, onCancel }: Props) {
     const [appPropsEntries, setAppPropsEntries] = useState<[string, string][]>(() =>
         Object.entries(user?.applicationProperties ?? {})
     );
+    const [imageError, setImageError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const setField = <K extends keyof UserProfile>(key: K, value: UserProfile[K]) => {
         setForm(previous => ({ ...previous, [key]: value }));
@@ -77,6 +79,40 @@ export function UserForm({ user, onSave, onCancel }: Props) {
         const roles = rolesText.split(',').map(_ => _.trim()).filter(Boolean);
         const applicationProperties = Object.fromEntries(appPropsEntries.filter(([key]) => key.trim() !== ''));
         onSave({ ...form, roles, applicationProperties });
+    };
+
+    const selectImage = () => {
+        fileInputRef.current?.click();
+    };
+
+    const onImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            setImageError('Selected file must be an image.');
+            event.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+            setField('imageUrl', dataUrl);
+            setImageError(null);
+        };
+        reader.onerror = () => {
+            setImageError('Unable to read the selected image file.');
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    };
+
+    const clearImage = () => {
+        setField('imageUrl', '');
+        setImageError(null);
     };
 
     const isValid = form.name.trim().length > 0;
@@ -136,13 +172,24 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                 </div>
 
                 <div className="field-block full-width">
-                    <label htmlFor="image-url">Image URL</label>
-                    <InputText
-                        id="image-url"
-                        value={form.imageUrl}
-                        onChange={event => setField('imageUrl', event.target.value)}
-                        placeholder="https://example.com/avatar.png"
+                    <label>User image</label>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="image-file-input"
+                        onChange={onImageSelected}
                     />
+                    <div className="action-row">
+                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} />
+                        {form.imageUrl && (
+                            <Button label="Remove image" icon="pi pi-trash" severity="danger" outlined onClick={clearImage} />
+                        )}
+                    </div>
+                    {imageError && <Message severity="error" text={imageError} />}
+                    {form.imageUrl && (
+                        <img className="image-preview" src={form.imageUrl} alt="User profile" />
+                    )}
                 </div>
             </div>
 

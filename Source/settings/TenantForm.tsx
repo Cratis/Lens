@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { ChangeEvent, useRef, useState } from 'react';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
+import { Message } from 'primereact/message';
 import { Tenant } from '../shared/types';
 
 interface Props {
@@ -20,9 +21,45 @@ function createTenant(): Tenant {
 
 export function TenantForm({ tenant, onSave, onCancel }: Props) {
     const [form, setForm] = useState<Tenant>(() => tenant ? { ...tenant } : createTenant());
+    const [imageError, setImageError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const setField = <K extends keyof Tenant>(key: K, value: Tenant[K]) => {
         setForm(previous => ({ ...previous, [key]: value }));
+    };
+
+    const selectImage = () => {
+        fileInputRef.current?.click();
+    };
+
+    const onImageSelected = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            setImageError('Selected file must be an image.');
+            event.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+            setField('imageUrl', dataUrl);
+            setImageError(null);
+        };
+        reader.onerror = () => {
+            setImageError('Unable to read the selected image file.');
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    };
+
+    const clearImage = () => {
+        setField('imageUrl', '');
+        setImageError(null);
     };
 
     const isValid = form.id.trim().length > 0 && form.name.trim().length > 0;
@@ -63,13 +100,24 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
                 </div>
 
                 <div className="field-block full-width">
-                    <label htmlFor="tenant-image-url">Image URL</label>
-                    <InputText
-                        id="tenant-image-url"
-                        value={form.imageUrl}
-                        onChange={event => setField('imageUrl', event.target.value)}
-                        placeholder="https://example.com/logo.png"
+                    <label>Tenant image</label>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="image-file-input"
+                        onChange={onImageSelected}
                     />
+                    <div className="action-row">
+                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} />
+                        {form.imageUrl && (
+                            <Button label="Remove image" icon="pi pi-trash" severity="danger" outlined onClick={clearImage} />
+                        )}
+                    </div>
+                    {imageError && <Message severity="error" text={imageError} />}
+                    {form.imageUrl && (
+                        <img className="image-preview" src={form.imageUrl} alt="Tenant" />
+                    )}
                 </div>
             </div>
 
