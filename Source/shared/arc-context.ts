@@ -3,7 +3,17 @@ export interface ArcContextSnapshot {
     baseUrl: string | null;
     pageOrigin: string | null;
     configuration: Record<string, unknown> | null;
+    detectionMethod?: 'context' | 'path-fallback';
+    diagnostics?: ArcContextDiagnostics;
     capturedAt: number;
+}
+
+export interface ArcContextDiagnostics {
+    selectedTabId: number | null;
+    selectedTabUrl: string | null;
+    tabSelectionStrategy: string;
+    executeScriptStatus: 'not-run' | 'success' | 'empty-result' | 'error';
+    errorMessage: string | null;
 }
 
 const ARC_CONTEXT_SNAPSHOT_KEY = 'arcContextSnapshot';
@@ -13,13 +23,56 @@ interface ArcContextDetectionResult {
     baseUrl: string | null;
     pageOrigin: string;
     configuration: Record<string, unknown> | null;
+    detectionMethod: 'context' | 'path-fallback';
 }
 
 const MAX_SANITIZATION_DEPTH = 6;
 const ARC_CONTEXT_MARKER_PROPERTY = 'reconnectQueries';
+const ARC_CONFIGURATION_BASE_URL_KEYS = [
+    'baseUrl',
+    'apiBaseUrl',
+    'apiSurface',
+    'apiSurfaceBaseUrl',
+    'baseUri',
+    'baseAddress',
+];
 
 function isObject(value: unknown): value is object {
     return typeof value === 'object' && value !== null;
+}
+
+function isInspectablePageUrl(url: string | undefined): boolean {
+    if (!url) return false;
+    return url.startsWith('http://') || url.startsWith('https://');
+}
+
+interface TabResolutionResult {
+    tab: chrome.tabs.Tab | undefined;
+    strategy: string;
+}
+
+async function resolveBestTabForArcCapture(): Promise<TabResolutionResult> {
+    const [activeLastFocused] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    if (isInspectablePageUrl(activeLastFocused?.url)) {
+        return { tab: activeLastFocused, strategy: 'active-last-focused' };
+    }
+
+    const activeTabs = await chrome.tabs.query({ active: true });
+    const activeInspectable = activeTabs.find(tab => isInspectablePageUrl(tab.url));
+    if (activeInspectable) {
+        return { tab: activeInspectable, strategy: 'active-any-window' };
+    }
+
+    const allTabs = await chrome.tabs.query({});
+    const inspectableTabs = allTabs
+        .filter(tab => isInspectablePageUrl(tab.url))
+        .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+
+    if (inspectableTabs[0]) {
+        return { tab: inspectableTabs[0], strategy: 'most-recent-inspectable' };
+    }
+
+    return { tab: undefined, strategy: 'none' };
 }
 
 function getOrigin(url: string | undefined): string | null {
@@ -31,24 +84,82 @@ function getOrigin(url: string | undefined): string | null {
     }
 }
 
-function toSnapshot(result: ArcContextDetectionResult): ArcContextSnapshot {
+function toSnapshot(result: ArcContextDetectionResult, diagnostics: ArcContextDiagnostics): ArcContextSnapshot {
     return {
         isArcApplication: result.isArcApplication,
         baseUrl: result.baseUrl,
         pageOrigin: result.pageOrigin,
         configuration: result.configuration,
+        detectionMethod: result.detectionMethod,
+        diagnostics,
         capturedAt: Date.now(),
     };
 }
 
-function createNonArcSnapshot(pageOrigin: string | null): ArcContextSnapshot {
+function createNonArcSnapshot(pageOrigin: string | null, diagnostics?: ArcContextDiagnostics): ArcContextSnapshot {
     return {
         isArcApplication: false,
         baseUrl: null,
         pageOrigin,
         configuration: null,
+        detectionMethod: 'path-fallback',
+        diagnostics,
         capturedAt: Date.now(),
     };
+}
+
+function looksLikeArcApplicationPath(pathname: string): boolean {
+    const guid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+    const pattern = new RegExp(`^/projects/${guid}/application/${guid}(?:/|$)`);
+    return pattern.test(pathname);
+}
+
+function looksLikeArcApplicationUrl(url: string | undefined): boolean {
+    if (!url) return false;
+    try {
+        return looksLikeArcApplicationPath(new URL(url).pathname);
+    } catch {
+        return false;
+    }
+}
+
+function toAbsoluteBaseUrl(value: unknown, pageOrigin: string): string | null {
+    if (typeof value !== 'string' || !value.trim()) return null;
+    try {
+        return new URL(value, pageOrigin).origin;
+    } catch {
+        return null;
+    }
+}
+
+function getConfiguredBaseUrl(configuration: Record<string, unknown> | null, pageOrigin: string): string | null {
+    if (!configuration) return null;
+    for (const key of ARC_CONFIGURATION_BASE_URL_KEYS) {
+        const resolved = toAbsoluteBaseUrl(configuration[key], pageOrigin);
+        if (resolved) {
+            return resolved;
+        }
+    }
+    return null;
+}
+
+function isArcContextValue(value: unknown): value is Record<string, unknown> {
+    if (!isObject(value)) {
+        return false;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    if (ARC_CONTEXT_MARKER_PROPERTY in candidate) {
+        return true;
+    }
+
+    const configuration = candidate.configuration;
+    if (!isObject(configuration)) {
+        return false;
+    }
+
+    const config = configuration as Record<string, unknown>;
+    return ARC_CONFIGURATION_BASE_URL_KEYS.some(key => key in config);
 }
 
 function detectArcContextFromPage(): ArcContextDetectionResult {
@@ -69,62 +180,46 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         return null;
     }
 
-    function toAbsoluteBaseUrl(value: unknown, pageOrigin: string): string | null {
-        if (typeof value !== 'string' || !value.trim()) return null;
-        try {
-            return new URL(value, pageOrigin).origin;
-        } catch {
-            return null;
-        }
-    }
-
-    function getConfiguredBaseUrl(configuration: Record<string, unknown> | null, pageOrigin: string): string | null {
-        if (!configuration) return null;
-        // Arc apps may expose base URL under different configuration names.
-        // We check the most explicit/common names first.
-        const candidates = [
-            configuration.baseUrl,
-            configuration.apiBaseUrl,
-            configuration.apiSurface,
-            configuration.apiSurfaceBaseUrl,
-            configuration.baseUri,
-            configuration.baseAddress,
-        ];
-
-        for (const candidate of candidates) {
-            const resolved = toAbsoluteBaseUrl(candidate, pageOrigin);
-            if (resolved) {
-                return resolved;
-            }
-        }
-
-        return null;
-    }
-
     const pageOrigin = window.location.origin;
+    const pagePathname = window.location.pathname;
     const root = document.getElementById('root');
     if (!root) {
         return {
-            isArcApplication: false,
-            baseUrl: null,
+            isArcApplication: looksLikeArcApplicationPath(pagePathname),
+            baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
             pageOrigin,
             configuration: null,
+            detectionMethod: 'path-fallback',
         };
     }
 
     const fiberKey = Object.keys(root).find(key => key.startsWith('__reactFiber'));
-    if (!fiberKey) {
+    const containerKey = Object.keys(root).find(key => key.startsWith('__reactContainer'));
+    if (!fiberKey && !containerKey) {
         return {
-            isArcApplication: false,
-            baseUrl: null,
+            isArcApplication: looksLikeArcApplicationPath(pagePathname),
+            baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
             pageOrigin,
             configuration: null,
+            detectionMethod: 'path-fallback',
         };
     }
 
     const visited = new WeakSet<object>();
-    const fiberNode = (root as unknown as Record<string, unknown>)[fiberKey];
-    const queue: object[] = isObject(fiberNode) ? [fiberNode] : [];
+    const rootObject = root as unknown as Record<string, unknown>;
+    const fiberNode = fiberKey ? rootObject[fiberKey] : undefined;
+    const containerNode = containerKey ? rootObject[containerKey] : undefined;
+    const queue: object[] = [];
+    if (isObject(fiberNode)) {
+        queue.push(fiberNode);
+    }
+    if (isObject(containerNode)) {
+        queue.push(containerNode);
+        const current = (containerNode as Record<string, unknown>).current;
+        if (isObject(current)) {
+            queue.push(current);
+        }
+    }
 
     while (queue.length > 0) {
         const node = queue.pop() as Record<string, unknown> | undefined;
@@ -135,11 +230,7 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         const memoizedProps = node.memoizedProps as Record<string, unknown> | undefined;
         const contextValue = memoizedProps?.value;
 
-        if (
-            contextValue &&
-            typeof contextValue === 'object' &&
-            ARC_CONTEXT_MARKER_PROPERTY in (contextValue as Record<string, unknown>)
-        ) {
+        if (isArcContextValue(contextValue)) {
             const context = contextValue as Record<string, unknown>;
             const configuration = sanitize(context.configuration) as Record<string, unknown> | null;
             const baseUrl = getConfiguredBaseUrl(configuration, pageOrigin) ?? pageOrigin;
@@ -149,6 +240,7 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
                 baseUrl,
                 pageOrigin,
                 configuration,
+                detectionMethod: 'context',
             };
         }
 
@@ -161,23 +253,38 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
     }
 
     return {
-        isArcApplication: false,
-        baseUrl: null,
+        isArcApplication: looksLikeArcApplicationPath(pagePathname),
+        baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
         pageOrigin,
         configuration: null,
+        detectionMethod: 'path-fallback',
     };
 }
 
 export async function captureArcContextForActiveTab(): Promise<ArcContextSnapshot> {
-    const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const resolution = await resolveBestTabForArcCapture();
+    const activeTab = resolution.tab;
+    const diagnostics: ArcContextDiagnostics = {
+        selectedTabId: activeTab?.id ?? null,
+        selectedTabUrl: activeTab?.url ?? null,
+        tabSelectionStrategy: resolution.strategy,
+        executeScriptStatus: 'not-run',
+        errorMessage: null,
+    };
+
     const pageOrigin = getOrigin(activeTab?.url);
+    const arcByUrl = looksLikeArcApplicationUrl(activeTab?.url);
     if (!activeTab?.id || !activeTab.url) {
-        return createNonArcSnapshot(pageOrigin);
+        console.info('[Lens][ArcContext] No inspectable tab found', diagnostics);
+        return createNonArcSnapshot(pageOrigin, diagnostics);
     }
 
-    if (activeTab.url.startsWith('chrome://') || activeTab.url.startsWith('chrome-extension://')) {
-        return createNonArcSnapshot(pageOrigin);
+    if (!isInspectablePageUrl(activeTab.url)) {
+        console.info('[Lens][ArcContext] Selected tab is not inspectable', diagnostics);
+        return createNonArcSnapshot(pageOrigin, diagnostics);
     }
+
+    console.info('[Lens][ArcContext] Capturing context', diagnostics);
 
     try {
         const [executionResult] = await chrome.scripting.executeScript({
@@ -189,12 +296,47 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
 
         const result = executionResult?.result as ArcContextDetectionResult | undefined;
         if (!result) {
-            return createNonArcSnapshot(pageOrigin);
+            diagnostics.executeScriptStatus = 'empty-result';
+            console.info('[Lens][ArcContext] executeScript returned no result', diagnostics);
+            if (arcByUrl) {
+                return {
+                    isArcApplication: true,
+                    baseUrl: pageOrigin,
+                    pageOrigin,
+                    configuration: null,
+                    detectionMethod: 'path-fallback',
+                    diagnostics,
+                    capturedAt: Date.now(),
+                };
+            }
+            return createNonArcSnapshot(pageOrigin, diagnostics);
         }
 
-        return toSnapshot(result);
-    } catch {
-        return createNonArcSnapshot(pageOrigin);
+        diagnostics.executeScriptStatus = 'success';
+        console.info('[Lens][ArcContext] Context result', {
+            ...diagnostics,
+            isArcApplication: result.isArcApplication,
+            baseUrl: result.baseUrl,
+            detectionMethod: result.detectionMethod,
+        });
+
+        return toSnapshot(result, diagnostics);
+    } catch (error) {
+        diagnostics.executeScriptStatus = 'error';
+        diagnostics.errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn('[Lens][ArcContext] executeScript failed', diagnostics);
+        if (arcByUrl) {
+            return {
+                isArcApplication: true,
+                baseUrl: pageOrigin,
+                pageOrigin,
+                configuration: null,
+                detectionMethod: 'path-fallback',
+                diagnostics,
+                capturedAt: Date.now(),
+            };
+        }
+        return createNonArcSnapshot(pageOrigin, diagnostics);
     }
 }
 

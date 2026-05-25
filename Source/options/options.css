@@ -129,6 +129,34 @@ body {
     margin-bottom: 16px;
 }
 
+.warning-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.warning-details {
+    margin-top: 10px;
+    color: var(--text);
+}
+
+.warning-details summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--accent);
+    margin-bottom: 6px;
+}
+
+.warning-details-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    word-break: break-all;
+}
+
 /* Cards */
 .card {
     background: var(--bg-card);

@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { ExtensionSettings, UserProfile, Tenant } from '../shared/types';
 import { getSettings, saveSettings, getActiveUser, getActiveTenant } from '../shared/storage';
 import { captureArcContextForActiveTab, saveArcContextSnapshot } from '../shared/arc-context';
+import { Options } from '../options/Options';
 import './popup.css';
 
 export function Popup() {
     const [settings, setSettings] = useState<ExtensionSettings | null>(null);
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => {
         getSettings().then(setSettings);
@@ -16,6 +18,13 @@ export function Popup() {
             .then(saveArcContextSnapshot)
             .catch(() => undefined);
     }, []);
+
+    useEffect(() => {
+        document.body.classList.toggle('popup-settings-open', showSettings);
+        return () => {
+            document.body.classList.remove('popup-settings-open');
+        };
+    }, [showSettings]);
 
     const selectUser = useCallback(async (userId: string) => {
         if (!settings) return;
@@ -31,12 +40,22 @@ export function Popup() {
         await saveSettings(updated);
     }, [settings]);
 
-    const openOptions = () => {
-        chrome.runtime.openOptionsPage();
-    };
-
     if (!settings) {
         return <div className="popup loading">Loading…</div>;
+    }
+
+    if (showSettings) {
+        return (
+            <div className="popup popup-settings-mode">
+                <header className="popup-header">
+                    <span className="popup-title">Lens Settings</span>
+                    <button className="icon-btn" onClick={() => setShowSettings(false)} title="Back to quick view">←</button>
+                </header>
+                <div className="popup-settings-content">
+                    <Options />
+                </div>
+            </div>
+        );
     }
 
     const activeUser = getActiveUser(settings);
@@ -46,7 +65,7 @@ export function Popup() {
         <div className="popup">
             <header className="popup-header">
                 <span className="popup-title">Lens</span>
-                <button className="icon-btn" onClick={openOptions} title="Open settings">⚙</button>
+                <button className="icon-btn" onClick={() => setShowSettings(true)} title="Open settings">⚙</button>
             </header>
 
             <section className="popup-section">
@@ -54,7 +73,7 @@ export function Popup() {
                 {settings.users.length === 0 ? (
                     <p className="empty-hint">
                         No users configured.{' '}
-                        <button className="link-btn" onClick={openOptions}>Add one →</button>
+                        <button className="link-btn" onClick={() => setShowSettings(true)}>Add one →</button>
                     </p>
                 ) : (
                     <div className="selector-list">
@@ -92,7 +111,7 @@ export function Popup() {
                 {settings.tenants.length === 0 ? (
                     <p className="empty-hint">
                         No tenants configured.{' '}
-                        <button className="link-btn" onClick={openOptions}>Add one →</button>
+                        <button className="link-btn" onClick={() => setShowSettings(true)}>Add one →</button>
                     </p>
                 ) : (
                     <div className="selector-list">
