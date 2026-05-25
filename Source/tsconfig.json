@@ -16,5 +16,5 @@
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true
     },
-    "include": ["background", "options", "popup", "shared"]
+    "include": ["background", "shared", "arc", "commands", "context", "queries", "settings", "*.ts", "*.tsx"]
 }
