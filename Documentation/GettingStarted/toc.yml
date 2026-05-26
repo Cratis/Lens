@@ -3,4 +3,6 @@
   items:
     - name: Local Development
       href: LocalDevelopment/toc.yml
+    - name: Publishing Setup
+      href: Publishing/toc.yml
 
