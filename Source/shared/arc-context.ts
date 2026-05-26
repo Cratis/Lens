@@ -123,6 +123,23 @@ function looksLikeArcApplicationUrl(url: string | undefined): boolean {
     }
 }
 
+function looksLikeLocalDevelopmentUrl(url: string | undefined): boolean {
+    if (!url) {
+        return false;
+    }
+
+    try {
+        const parsed = new URL(url);
+        if (!(parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+            return false;
+        }
+
+        return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    } catch {
+        return false;
+    }
+}
+
 function toAbsoluteBaseUrl(value: unknown, pageOrigin: string): string | null {
     if (typeof value !== 'string' || !value.trim()) return null;
     try {
@@ -273,7 +290,7 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
     };
 
     const pageOrigin = getOrigin(activeTab?.url);
-    const arcByUrl = looksLikeArcApplicationUrl(activeTab?.url);
+    const arcByUrl = looksLikeArcApplicationUrl(activeTab?.url) || looksLikeLocalDevelopmentUrl(activeTab?.url);
     if (!activeTab?.id || !activeTab.url) {
         console.info('[Lens][ArcContext] No inspectable tab found', diagnostics);
         return createNonArcSnapshot(pageOrigin, diagnostics);
