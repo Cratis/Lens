@@ -3,6 +3,8 @@
   items:
     - name: Local Development
       href: LocalDevelopment/toc.yml
+    - name: Build and Side Load in Chrome
+      href: BuildAndSideLoadInChrome/toc.yml
     - name: Publishing Setup
       href: Publishing/toc.yml
 

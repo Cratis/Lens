@@ -83,7 +83,8 @@ How to get them:
 - `FIREFOX_API_KEY`
 - `FIREFOX_API_SECRET`
 
-These are passed to `npx web-ext sign` for signing and publishing the extension.
+These are passed to `yarn dlx web-ext sign` for signing and
+publishing the extension.
 
 How to get them:
 
