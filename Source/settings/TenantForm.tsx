@@ -8,6 +8,7 @@ interface Props {
     tenant: Tenant | null;
     onSave: (tenant: Tenant) => void;
     onCancel: () => void;
+    readOnly?: boolean;
 }
 
 function createTenant(): Tenant {
@@ -16,10 +17,11 @@ function createTenant(): Tenant {
         name: '',
         description: '',
         imageUrl: '',
+        source: 'custom',
     };
 }
 
-export function TenantForm({ tenant, onSave, onCancel }: Props) {
+export function TenantForm({ tenant, onSave, onCancel, readOnly = false }: Props) {
     const [form, setForm] = useState<Tenant>(() => tenant ? { ...tenant } : createTenant());
     const [imageError, setImageError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -74,6 +76,7 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
                     <InputText
                         id="tenant-id"
                         value={form.id}
+                        disabled={readOnly}
                         onChange={event => setField('id', event.target.value)}
                         placeholder="acme-corp"
                     />
@@ -84,6 +87,7 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
                     <InputText
                         id="tenant-name"
                         value={form.name}
+                        disabled={readOnly}
                         onChange={event => setField('name', event.target.value)}
                         placeholder="Acme Corporation"
                     />
@@ -94,6 +98,7 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
                     <InputText
                         id="tenant-description"
                         value={form.description}
+                        disabled={readOnly}
                         onChange={event => setField('description', event.target.value)}
                         placeholder="Optional description"
                     />
@@ -109,8 +114,8 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
                         onChange={onImageSelected}
                     />
                     <div className="action-row">
-                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} />
-                        {form.imageUrl && (
+                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} disabled={readOnly} />
+                        {form.imageUrl && !readOnly && (
                             <Button label="Remove image" icon="pi pi-trash" severity="danger" outlined onClick={clearImage} />
                         )}
                     </div>
@@ -122,8 +127,8 @@ export function TenantForm({ tenant, onSave, onCancel }: Props) {
             </div>
 
             <div className="action-row">
-                <Button label="Save tenant" icon="pi pi-check" onClick={() => onSave(form)} disabled={!isValid} />
-                <Button label="Cancel" icon="pi pi-times" outlined onClick={onCancel} />
+                {!readOnly && <Button label="Save tenant" icon="pi pi-check" onClick={() => onSave(form)} disabled={!isValid} />}
+                <Button label={readOnly ? 'Close' : 'Cancel'} icon="pi pi-times" outlined onClick={onCancel} />
             </div>
         </div>
     );

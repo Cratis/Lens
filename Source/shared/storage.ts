@@ -29,9 +29,64 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     arcBaseUrl: 'http://localhost:5000',
 };
 
+function isObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function normalizeUser(user: Partial<UserProfile>): UserProfile {
+    const identityDetails = isObject(user.identityDetails)
+        ? user.identityDetails
+        : user.applicationProperties ?? {};
+
+    return {
+        id: typeof user.id === 'string' ? user.id : '',
+        name: typeof user.name === 'string' ? user.name : '',
+        displayName: typeof user.displayName === 'string' ? user.displayName : '',
+        identityProvider: typeof user.identityProvider === 'string' ? user.identityProvider : 'aad',
+        roles: Array.isArray(user.roles) ? user.roles.map(_ => String(_)) : [],
+        claims: Array.isArray(user.claims)
+            ? user.claims
+                .filter(_ => isObject(_))
+                .map(_ => ({
+                    type: typeof _.type === 'string' ? _.type : '',
+                    value: typeof _.value === 'string' ? _.value : '',
+                }))
+            : [],
+        applicationProperties: isObject(user.applicationProperties)
+            ? Object.fromEntries(Object.entries(user.applicationProperties).map(([key, value]) => [key, String(value)]))
+            : {},
+        identityDetails,
+        imageUrl: typeof user.imageUrl === 'string' ? user.imageUrl : '',
+        source: user.source === 'arc' ? 'arc' : 'custom',
+    };
+}
+
+function normalizeTenant(tenant: Partial<Tenant>): Tenant {
+    return {
+        id: typeof tenant.id === 'string' ? tenant.id : '',
+        name: typeof tenant.name === 'string' ? tenant.name : '',
+        description: typeof tenant.description === 'string' ? tenant.description : '',
+        imageUrl: typeof tenant.imageUrl === 'string' ? tenant.imageUrl : '',
+        source: tenant.source === 'arc' ? 'arc' : 'custom',
+    };
+}
+
+function normalizeSettings(settings: Partial<ExtensionSettings>): ExtensionSettings {
+    return {
+        ...DEFAULT_SETTINGS,
+        ...settings,
+        users: Array.isArray(settings.users)
+            ? settings.users.map(_ => normalizeUser(_ as Partial<UserProfile>))
+            : DEFAULT_SETTINGS.users,
+        tenants: Array.isArray(settings.tenants)
+            ? settings.tenants.map(_ => normalizeTenant(_ as Partial<Tenant>))
+            : DEFAULT_SETTINGS.tenants,
+    };
+}
+
 export async function getSettings(): Promise<ExtensionSettings> {
     const data = await chrome.storage.sync.get('settings');
-    return { ...DEFAULT_SETTINGS, ...(data.settings as Partial<ExtensionSettings>) };
+    return normalizeSettings((data.settings as Partial<ExtensionSettings>) ?? {});
 }
 
 export async function saveSettings(settings: ExtensionSettings): Promise<void> {

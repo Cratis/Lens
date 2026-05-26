@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Tooltip } from 'primereact/tooltip';
+import { JsonSchema } from './arc/introspection';
 import { ExtensionSettings } from './shared/types';
 import {
     DEFAULT_NAVIGATION_STATE,
@@ -16,6 +17,7 @@ import { SettingsView } from './settings/SettingsView';
 import { ContextView } from './context/ContextView';
 import { CommandsView } from './commands/CommandsView';
 import { QueriesView } from './queries/QueriesView';
+import { fetchArcDevelopmentSources, mergeArcSourcedSettings } from './settings/arcDevelopmentSources';
 import './lens-popup.css';
 
 type Tab = PopupTab;
@@ -40,7 +42,31 @@ export function LensPopup() {
     const [navigationHydrated, setNavigationHydrated] = useState(false);
     const [arcStatusHovered, setArcStatusHovered] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [identityDetailsSchema, setIdentityDetailsSchema] = useState<JsonSchema | undefined>(undefined);
     const hasArcContext = arcContext?.isArcApplication === true;
+
+    const mergeAndPersistArcSources = async (snapshot: ArcContextSnapshot, currentSettings: ExtensionSettings): Promise<ExtensionSettings> => {
+        if (!snapshot.isArcApplication || !snapshot.baseUrl) {
+            setIdentityDetailsSchema(undefined);
+            return currentSettings;
+        }
+
+        try {
+            const sources = await fetchArcDevelopmentSources(snapshot.baseUrl);
+            setIdentityDetailsSchema(sources.identityDetailsSchema);
+
+            const mergedSettings = mergeArcSourcedSettings(currentSettings, sources);
+            if (JSON.stringify(currentSettings) !== JSON.stringify(mergedSettings)) {
+                setSettings(mergedSettings);
+                await saveSettings(mergedSettings);
+            }
+
+            return mergedSettings;
+        } catch {
+            setIdentityDetailsSchema(undefined);
+            return currentSettings;
+        }
+    };
 
     const refreshArcContext = async () => {
         setArcContextLoading(true);
@@ -48,6 +74,10 @@ export function LensPopup() {
             const freshSnapshot = await captureArcContextForActiveTab();
             await saveArcContextSnapshot(freshSnapshot);
             setArcContext(freshSnapshot);
+
+            if (settings) {
+                await mergeAndPersistArcSources(freshSnapshot, settings);
+            }
         } finally {
             setArcContextLoading(false);
         }
@@ -77,8 +107,11 @@ export function LensPopup() {
             const freshSnapshot = await captureArcContextForActiveTab();
             await saveArcContextSnapshot(freshSnapshot);
 
+            const resolvedSettings = await mergeAndPersistArcSources(freshSnapshot, loadedSettings);
+
             if (!cancelled) {
                 setArcContext(freshSnapshot);
+                setSettings(resolvedSettings);
                 setArcContextLoading(false);
             }
         };
@@ -223,7 +256,7 @@ export function LensPopup() {
 
                 <main className="view-panel">
                     {resolvedActiveTab === 'settings' && (
-                        <SettingsView settings={settings} onChange={handleChange} />
+                        <SettingsView settings={settings} onChange={handleChange} identityDetailsSchema={identityDetailsSchema} />
                     )}
 
                     {resolvedActiveTab === 'context' && (

@@ -1,12 +1,17 @@
 import { ExtensionSettings, UserProfile } from './types';
 
 function buildClientPrincipal(user: UserProfile): string {
+    const identityDetails = user.identityDetails && typeof user.identityDetails === 'object'
+        ? user.identityDetails
+        : {};
+
     const principal = {
         identityProvider: user.identityProvider || 'aad',
         userId: user.id,
         userDetails: user.name,
         userRoles: user.roles.length > 0 ? user.roles : ['authenticated', 'anonymous'],
         claims: user.claims.map(claim => ({ typ: claim.type, val: claim.value })),
+        ...identityDetails,
         ...user.applicationProperties,
     };
 

@@ -3,12 +3,16 @@ import { Button } from 'primereact/button';
 import { Dropdown } from 'primereact/dropdown';
 import { InputText } from 'primereact/inputtext';
 import { Message } from 'primereact/message';
+import { JsonSchema } from '../arc/introspection';
+import { CommandSchemaEditor, setValueAtPath } from '../commands/CommandSchemaEditor';
 import { Claim, UserProfile } from '../shared/types';
 
 interface Props {
     user: UserProfile | null;
     onSave: (user: UserProfile) => void;
     onCancel: () => void;
+    identityDetailsSchema?: JsonSchema;
+    readOnly?: boolean;
 }
 
 const providerOptions = [
@@ -28,16 +32,15 @@ function createUser(): UserProfile {
         roles: ['authenticated', 'anonymous'],
         claims: [],
         applicationProperties: {},
+        identityDetails: {},
         imageUrl: '',
+        source: 'custom',
     };
 }
 
-export function UserForm({ user, onSave, onCancel }: Props) {
+export function UserForm({ user, onSave, onCancel, identityDetailsSchema, readOnly = false }: Props) {
     const [form, setForm] = useState<UserProfile>(() => user ? { ...user } : createUser());
     const [rolesText, setRolesText] = useState(() => (user?.roles ?? ['authenticated', 'anonymous']).join(', '));
-    const [appPropsEntries, setAppPropsEntries] = useState<[string, string][]>(() =>
-        Object.entries(user?.applicationProperties ?? {})
-    );
     const [imageError, setImageError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -58,27 +61,21 @@ export function UserForm({ user, onSave, onCancel }: Props) {
         setField('claims', form.claims.filter((_, claimIndex) => claimIndex !== index));
     };
 
-    const addAppProp = () => {
-        setAppPropsEntries(previous => [...previous, ['', '']]);
-    };
+    const updateIdentityDetails = (path: string, value: unknown) => {
+        if (!path) {
+            setField('identityDetails', { value });
+            return;
+        }
 
-    const updateAppProp = (index: number, col: 0 | 1, value: string) => {
-        setAppPropsEntries(previous => previous.map((entry, entryIndex) => {
-            if (entryIndex !== index) {
-                return entry;
-            }
-            return col === 0 ? [value, entry[1]] : [entry[0], value];
-        }));
-    };
-
-    const removeAppProp = (index: number) => {
-        setAppPropsEntries(previous => previous.filter((_, entryIndex) => entryIndex !== index));
+        const current = form.identityDetails && typeof form.identityDetails === 'object'
+            ? form.identityDetails
+            : {};
+        setField('identityDetails', setValueAtPath(current, path, value));
     };
 
     const save = () => {
         const roles = rolesText.split(',').map(_ => _.trim()).filter(Boolean);
-        const applicationProperties = Object.fromEntries(appPropsEntries.filter(([key]) => key.trim() !== ''));
-        onSave({ ...form, roles, applicationProperties });
+        onSave({ ...form, roles, source: form.source ?? 'custom' });
     };
 
     const selectImage = () => {
@@ -127,6 +124,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                     <InputText
                         id="user-name"
                         value={form.name}
+                        disabled={readOnly}
                         onChange={event => setField('name', event.target.value)}
                         placeholder="john.doe@example.com"
                     />
@@ -137,6 +135,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                     <InputText
                         id="display-name"
                         value={form.displayName}
+                        disabled={readOnly}
                         onChange={event => setField('displayName', event.target.value)}
                         placeholder="John Doe"
                     />
@@ -148,6 +147,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                         id="identity-provider"
                         value={form.identityProvider}
                         options={providerOptions}
+                        disabled={readOnly}
                         onChange={event => setField('identityProvider', event.value as string)}
                     />
                 </div>
@@ -157,6 +157,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                     <InputText
                         id="user-id"
                         value={form.id}
+                        disabled={readOnly}
                         onChange={event => setField('id', event.target.value)}
                     />
                 </div>
@@ -166,6 +167,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                     <InputText
                         id="roles"
                         value={rolesText}
+                        disabled={readOnly}
                         onChange={event => setRolesText(event.target.value)}
                         placeholder="authenticated, anonymous"
                     />
@@ -181,8 +183,8 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                         onChange={onImageSelected}
                     />
                     <div className="action-row">
-                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} />
-                        {form.imageUrl && (
+                        <Button label="Upload image" icon="pi pi-upload" outlined onClick={selectImage} disabled={readOnly} />
+                        {form.imageUrl && !readOnly && (
                             <Button label="Remove image" icon="pi pi-trash" severity="danger" outlined onClick={clearImage} />
                         )}
                     </div>
@@ -196,7 +198,7 @@ export function UserForm({ user, onSave, onCancel }: Props) {
             <div className="editor-card">
                 <div className="editor-card-header">
                     <h4>Claims</h4>
-                    <Button icon="pi pi-plus" text rounded aria-label="Add claim" onClick={addClaim} />
+                    <Button icon="pi pi-plus" text rounded aria-label="Add claim" onClick={addClaim} disabled={readOnly} />
                 </div>
                 <Message severity="info" text="Claims are included in the X-MS-CLIENT-PRINCIPAL header." />
                 <div className="kv-editor">
@@ -204,15 +206,17 @@ export function UserForm({ user, onSave, onCancel }: Props) {
                         <div className="kv-row" key={`${claim.type}-${index}`}>
                             <InputText
                                 value={claim.type}
+                                readOnly={readOnly}
                                 onChange={event => updateClaim(index, 'type', event.target.value)}
                                 placeholder="type"
                             />
                             <InputText
                                 value={claim.value}
+                                readOnly={readOnly}
                                 onChange={event => updateClaim(index, 'value', event.target.value)}
                                 placeholder="value"
                             />
-                            <Button icon="pi pi-trash" text severity="danger" onClick={() => removeClaim(index)} />
+                            <Button icon="pi pi-trash" text severity="danger" disabled={readOnly} onClick={() => removeClaim(index)} />
                         </div>
                     ))}
                 </div>
@@ -220,31 +224,28 @@ export function UserForm({ user, onSave, onCancel }: Props) {
 
             <div className="editor-card">
                 <div className="editor-card-header">
-                    <h4>Application properties</h4>
-                    <Button icon="pi pi-plus" text rounded aria-label="Add property" onClick={addAppProp} />
+                    <h4>Identity details</h4>
                 </div>
-                <div className="kv-editor">
-                    {appPropsEntries.map(([key, value], index) => (
-                        <div className="kv-row" key={`${key}-${index}`}>
-                            <InputText
-                                value={key}
-                                onChange={event => updateAppProp(index, 0, event.target.value)}
-                                placeholder="property"
-                            />
-                            <InputText
-                                value={value}
-                                onChange={event => updateAppProp(index, 1, event.target.value)}
-                                placeholder="value"
-                            />
-                            <Button icon="pi pi-trash" text severity="danger" onClick={() => removeAppProp(index)} />
-                        </div>
-                    ))}
-                </div>
+                {identityDetailsSchema && (
+                    <div className="schema-editor">
+                        <CommandSchemaEditor
+                            schema={identityDetailsSchema}
+                            value={form.identityDetails}
+                            label="Details"
+                            path=""
+                            readOnly={readOnly}
+                            onChange={updateIdentityDetails}
+                        />
+                    </div>
+                )}
+                {!identityDetailsSchema && (
+                    <Message severity="warn" text="Identity details schema is unavailable for this Arc application." />
+                )}
             </div>
 
             <div className="action-row">
-                <Button label="Save user" icon="pi pi-check" onClick={save} disabled={!isValid} />
-                <Button label="Cancel" icon="pi pi-times" outlined onClick={onCancel} />
+                {!readOnly && <Button label="Save user" icon="pi pi-check" onClick={save} disabled={!isValid} />}
+                <Button label={readOnly ? 'Close' : 'Cancel'} icon="pi pi-times" outlined onClick={onCancel} />
             </div>
         </div>
     );

@@ -5,12 +5,17 @@ const RULE_USER_HEADERS = 1;
 const RULE_TENANT_HEADER = 2;
 
 function buildClientPrincipal(user: UserProfile): string {
+    const identityDetails = user.identityDetails && typeof user.identityDetails === 'object'
+        ? user.identityDetails
+        : {};
+
     const principal = {
         identityProvider: user.identityProvider || 'aad',
         userId: user.id,
         userDetails: user.name,
         userRoles: user.roles.length > 0 ? user.roles : ['authenticated', 'anonymous'],
         claims: user.claims.map(c => ({ typ: c.type, val: c.value })),
+        ...identityDetails,
         ...user.applicationProperties,
     };
     return btoa(JSON.stringify(principal));

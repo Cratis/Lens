@@ -9,6 +9,7 @@ interface SchemaFieldEditorProps {
     label: string;
     path: string;
     onChange: (path: string, value: unknown) => void;
+    readOnly?: boolean;
 }
 
 function parseArrayValue(input: string, itemType?: string): unknown[] {
@@ -103,7 +104,7 @@ export function setValueAtPath(target: Record<string, unknown>, path: string, va
     return clone;
 }
 
-export function CommandSchemaEditor({ schema, value, label, path, onChange }: SchemaFieldEditorProps) {
+export function CommandSchemaEditor({ schema, value, label, path, onChange, readOnly = false }: SchemaFieldEditorProps) {
     const schemaType = getSchemaType(schema);
 
     if (schemaType === 'object') {
@@ -124,6 +125,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
                             value={objectValue[propertyName]}
                             path={nextPath}
                             onChange={onChange}
+                            readOnly={readOnly}
                         />
                     );
                 })}
@@ -135,7 +137,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
         return (
             <div className="field-block inline-field">
                 <label>{label}</label>
-                <InputSwitch checked={Boolean(value)} onChange={event => onChange(path, event.value)} />
+                <InputSwitch checked={Boolean(value)} disabled={readOnly} onChange={event => onChange(path, event.value)} />
             </div>
         );
     }
@@ -146,6 +148,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
                 <label>{label}</label>
                 <InputNumber
                     value={typeof value === 'number' ? value : Number(value ?? 0)}
+                    disabled={readOnly}
                     onValueChange={event => onChange(path, event.value ?? 0)}
                     useGrouping={false}
                 />
@@ -160,6 +163,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
                 <label>{label} (comma separated)</label>
                 <InputText
                     value={formatArrayValue(value)}
+                    readOnly={readOnly}
                     onChange={event => onChange(path, parseArrayValue(event.target.value, itemType))}
                 />
             </div>
@@ -172,6 +176,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
                 <label>{label}</label>
                 <InputText
                     value={String(value ?? '')}
+                    readOnly={readOnly}
                     list={`enum-${path}`}
                     onChange={event => onChange(path, event.target.value)}
                 />
@@ -187,7 +192,7 @@ export function CommandSchemaEditor({ schema, value, label, path, onChange }: Sc
     return (
         <div className="field-block">
             <label>{label}</label>
-            <InputText value={String(value ?? '')} onChange={event => onChange(path, event.target.value)} />
+            <InputText value={String(value ?? '')} readOnly={readOnly} onChange={event => onChange(path, event.target.value)} />
         </div>
     );
 }

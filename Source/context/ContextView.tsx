@@ -24,7 +24,7 @@ export function ContextView({ settings, onChange }: Props) {
                             id="active-user"
                             value={settings.activeUserId}
                             options={settings.users.map(user => ({
-                                label: user.displayName || user.name,
+                                label: `${user.displayName || user.name}${user.source === 'arc' ? ' (Arc)' : ''}`,
                                 value: user.id,
                             }))}
                             showClear
@@ -39,7 +39,7 @@ export function ContextView({ settings, onChange }: Props) {
                             id="active-tenant"
                             value={settings.activeTenantId}
                             options={settings.tenants.map(tenant => ({
-                                label: tenant.name,
+                                label: `${tenant.name}${tenant.source === 'arc' ? ' (Arc)' : ''}`,
                                 value: tenant.id,
                             }))}
                             showClear

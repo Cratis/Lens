@@ -11,31 +11,41 @@ interface Props {
 
 type Mode = 'list' | 'add' | 'edit';
 
+function getSource(tenant: Tenant): 'custom' | 'arc' {
+    return tenant.source === 'arc' ? 'arc' : 'custom';
+}
+
 export function TenantList({ settings, onChange }: Props) {
-    const [mode, setMode] = useState<Mode>('list');
+    const [mode, setMode] = useState<Mode | 'view'>('list');
     const [editTenant, setEditTenant] = useState<Tenant | null>(null);
 
     const save = (tenant: Tenant) => {
+        const source = getSource(tenant);
         const tenants = mode === 'add'
-            ? [...settings.tenants, tenant]
-            : settings.tenants.map(_ => _.id === tenant.id ? tenant : _);
+            ? [...settings.tenants, { ...tenant, source: 'custom' as const }]
+            : settings.tenants.map(_ => _.id === tenant.id && getSource(_) === source ? tenant : _);
 
         onChange({ ...settings, tenants });
         setMode('list');
     };
 
-    const remove = (tenantId: string) => {
-        const tenants = settings.tenants.filter(_ => _.id !== tenantId);
-        const activeTenantId = settings.activeTenantId === tenantId ? '' : settings.activeTenantId;
+    const remove = (tenant: Tenant) => {
+        if (getSource(tenant) === 'arc') {
+            return;
+        }
+
+        const tenants = settings.tenants.filter(_ => !(_.id === tenant.id && getSource(_) === getSource(tenant)));
+        const activeTenantId = settings.activeTenantId === tenant.id ? '' : settings.activeTenantId;
         onChange({ ...settings, tenants, activeTenantId });
     };
 
-    if (mode === 'add' || mode === 'edit') {
+    if (mode === 'add' || mode === 'edit' || mode === 'view') {
         return (
             <TenantForm
                 tenant={editTenant}
                 onSave={save}
                 onCancel={() => setMode('list')}
+                readOnly={mode === 'view'}
             />
         );
     }
@@ -63,18 +73,29 @@ export function TenantList({ settings, onChange }: Props) {
             {settings.tenants.length > 0 && (
                 <div className="option-list">
                     {settings.tenants.map(tenant => (
-                        <div className="option-item" key={tenant.id}>
+                        <div className="option-item" key={`${getSource(tenant)}:${tenant.id}`}>
                             <div>
                                 <div className="option-item-title">{tenant.name}</div>
                                 <div className="option-item-subtitle">{tenant.id}</div>
                             </div>
                             <div className="option-item-actions">
                                 {settings.activeTenantId === tenant.id && <Tag value="Active" severity="success" />}
-                                <Button icon="pi pi-pencil" rounded text onClick={() => {
-                                    setEditTenant(tenant);
-                                    setMode('edit');
-                                }} />
-                                <Button icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(tenant.id)} />
+                                {getSource(tenant) === 'arc' && <Tag value="Arc" severity="info" />}
+                                {getSource(tenant) === 'arc' && (
+                                    <Button icon="pi pi-eye" rounded text onClick={() => {
+                                        setEditTenant(tenant);
+                                        setMode('view');
+                                    }} />
+                                )}
+                                {getSource(tenant) === 'custom' && (
+                                    <Button icon="pi pi-pencil" rounded text onClick={() => {
+                                        setEditTenant(tenant);
+                                        setMode('edit');
+                                    }} />
+                                )}
+                                {getSource(tenant) === 'custom' && (
+                                    <Button icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(tenant)} />
+                                )}
                             </div>
                         </div>
                     ))}

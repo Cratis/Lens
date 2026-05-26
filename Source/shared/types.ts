@@ -3,6 +3,8 @@ export interface Claim {
     value: string;
 }
 
+export type OptionSource = 'custom' | 'arc';
+
 export interface UserProfile {
     id: string;
     name: string;
@@ -11,7 +13,9 @@ export interface UserProfile {
     roles: string[];
     claims: Claim[];
     applicationProperties: Record<string, string>;
+    identityDetails: Record<string, unknown>;
     imageUrl: string;
+    source?: OptionSource;
 }
 
 export interface Tenant {
@@ -19,6 +23,7 @@ export interface Tenant {
     name: string;
     description: string;
     imageUrl: string;
+    source?: OptionSource;
 }
 
 export interface ExtensionSettings {
