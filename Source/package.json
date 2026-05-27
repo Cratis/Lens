@@ -11,7 +11,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
-        "@cratis/arc.react": "^20.26.18",
+        "@cratis/arc.react": "^20.28.0",
         "primeicons": "^7.0.0",
         "primereact": "^10.9.8",
         "react": "^18.3.1",
