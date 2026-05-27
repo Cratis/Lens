@@ -33,6 +33,7 @@ export interface ExtensionSettings {
     activeTenantId: string;
     tenantHeaderName: string;
     arcBaseUrl: string;
+    arcPageOrigin: string;
 }
 
 export interface CommandIntrospectionMetadata {

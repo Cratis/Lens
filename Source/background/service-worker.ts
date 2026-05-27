@@ -33,12 +33,41 @@ function buildUrlFilter(settings: ExtensionSettings): string {
     return '*';
 }
 
+function getHost(url: string): string | null {
+    try {
+        return new URL(url).hostname;
+    } catch {
+        return null;
+    }
+}
+
+function buildCondition(settings: ExtensionSettings): chrome.declarativeNetRequest.RuleCondition {
+    const initiatorHost = settings.arcPageOrigin ? getHost(settings.arcPageOrigin) : null;
+    if (initiatorHost) {
+        return {
+            urlFilter: '*',
+            initiatorDomains: [initiatorHost],
+            resourceTypes: [
+                chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
+            ],
+        };
+    }
+
+    const urlFilter = buildUrlFilter(settings);
+    return {
+        urlFilter,
+        resourceTypes: [
+            chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
+        ],
+    };
+}
+
 async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
     const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
     const removeRuleIds = existingRules.map(r => r.id);
 
     const addRules: chrome.declarativeNetRequest.Rule[] = [];
-    const urlFilter = buildUrlFilter(settings);
+    const condition = buildCondition(settings);
 
     const user = settings.users.find(u => u.id === settings.activeUserId);
     const tenant = settings.tenants.find(t => t.id === settings.activeTenantId);
@@ -68,10 +97,7 @@ async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
                 ],
             },
             condition: {
-                urlFilter,
-                resourceTypes: [
-                    chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
-                ],
+                ...condition,
             },
         });
     }
@@ -91,10 +117,7 @@ async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
                 ],
             },
             condition: {
-                urlFilter,
-                resourceTypes: [
-                    chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
-                ],
+                ...condition,
             },
         });
     }

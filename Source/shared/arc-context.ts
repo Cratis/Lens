@@ -26,21 +26,6 @@ interface ArcContextDetectionResult {
     detectionMethod: 'context' | 'path-fallback';
 }
 
-const MAX_SANITIZATION_DEPTH = 6;
-const ARC_CONTEXT_MARKER_PROPERTY = 'reconnectQueries';
-const ARC_CONFIGURATION_BASE_URL_KEYS = [
-    'baseUrl',
-    'apiBaseUrl',
-    'apiSurface',
-    'apiSurfaceBaseUrl',
-    'baseUri',
-    'baseAddress',
-];
-
-function isObject(value: unknown): value is object {
-    return typeof value === 'object' && value !== null;
-}
-
 function isInspectablePageUrl(url: string | undefined): boolean {
     if (!url) return false;
     return url.startsWith('http://') || url.startsWith('https://');
@@ -140,48 +125,66 @@ function looksLikeLocalDevelopmentUrl(url: string | undefined): boolean {
     }
 }
 
-function toAbsoluteBaseUrl(value: unknown, pageOrigin: string): string | null {
-    if (typeof value !== 'string' || !value.trim()) return null;
-    try {
-        return new URL(value, pageOrigin).origin;
-    } catch {
-        return null;
-    }
-}
-
-function getConfiguredBaseUrl(configuration: Record<string, unknown> | null, pageOrigin: string): string | null {
-    if (!configuration) return null;
-    for (const key of ARC_CONFIGURATION_BASE_URL_KEYS) {
-        const resolved = toAbsoluteBaseUrl(configuration[key], pageOrigin);
-        if (resolved) {
-            return resolved;
-        }
-    }
-    return null;
-}
-
-function isArcContextValue(value: unknown): value is Record<string, unknown> {
-    if (!isObject(value)) {
-        return false;
-    }
-
-    const candidate = value as Record<string, unknown>;
-    if (ARC_CONTEXT_MARKER_PROPERTY in candidate) {
-        return true;
-    }
-
-    const configuration = candidate.configuration;
-    if (!isObject(configuration)) {
-        return false;
-    }
-
-    const config = configuration as Record<string, unknown>;
-    return ARC_CONFIGURATION_BASE_URL_KEYS.some(key => key in config);
-}
-
 function detectArcContextFromPage(): ArcContextDetectionResult {
+    const maxSanitizationDepth = 6;
+    const arcContextMarkerProperty = 'reconnectQueries';
+    const arcConfigurationBaseUrlKeys = [
+        'baseUrl',
+        'apiBaseUrl',
+        'apiSurface',
+        'apiSurfaceBaseUrl',
+        'baseUri',
+        'baseAddress',
+    ];
+
+    const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+    const looksLikeArcApplicationPathLocal = (pathname: string): boolean => {
+        const guid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+        const pattern = new RegExp(`^/projects/${guid}/application/${guid}(?:/|$)`);
+        return pattern.test(pathname);
+    };
+
+    const toAbsoluteBaseUrlLocal = (value: unknown, pageOrigin: string): string | null => {
+        if (typeof value !== 'string' || !value.trim()) return null;
+        try {
+            return new URL(value, pageOrigin).origin;
+        } catch {
+            return null;
+        }
+    };
+
+    const getConfiguredBaseUrlLocal = (configuration: Record<string, unknown> | null, pageOrigin: string): string | null => {
+        if (!configuration) return null;
+        for (const key of arcConfigurationBaseUrlKeys) {
+            const resolved = toAbsoluteBaseUrlLocal(configuration[key], pageOrigin);
+            if (resolved) {
+                return resolved;
+            }
+        }
+        return null;
+    };
+
+    const isArcContextValueLocal = (value: unknown): value is Record<string, unknown> => {
+        if (!isRecord(value)) {
+            return false;
+        }
+
+        const candidate = value as Record<string, unknown>;
+        if (arcContextMarkerProperty in candidate) {
+            return true;
+        }
+
+        const configuration = candidate.configuration;
+        if (!isRecord(configuration)) {
+            return false;
+        }
+
+        return arcConfigurationBaseUrlKeys.some(key => key in configuration);
+    };
+
     function sanitize(value: unknown, depth = 0): unknown {
-        if (depth > MAX_SANITIZATION_DEPTH) return null;
+        if (depth > maxSanitizationDepth) return null;
         if (value === null || value === undefined) return value;
         if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
         if (Array.isArray(value)) return value.map(item => sanitize(item, depth + 1));
@@ -202,8 +205,8 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
     const root = document.getElementById('root');
     if (!root) {
         return {
-            isArcApplication: looksLikeArcApplicationPath(pagePathname),
-            baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
+            isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
+            baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
             pageOrigin,
             configuration: null,
             detectionMethod: 'path-fallback',
@@ -214,8 +217,8 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
     const containerKey = Object.keys(root).find(key => key.startsWith('__reactContainer'));
     if (!fiberKey && !containerKey) {
         return {
-            isArcApplication: looksLikeArcApplicationPath(pagePathname),
-            baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
+            isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
+            baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
             pageOrigin,
             configuration: null,
             detectionMethod: 'path-fallback',
@@ -227,13 +230,13 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
     const fiberNode = fiberKey ? rootObject[fiberKey] : undefined;
     const containerNode = containerKey ? rootObject[containerKey] : undefined;
     const queue: object[] = [];
-    if (isObject(fiberNode)) {
+    if (isRecord(fiberNode)) {
         queue.push(fiberNode);
     }
-    if (isObject(containerNode)) {
+    if (isRecord(containerNode)) {
         queue.push(containerNode);
         const current = (containerNode as Record<string, unknown>).current;
-        if (isObject(current)) {
+        if (isRecord(current)) {
             queue.push(current);
         }
     }
@@ -247,10 +250,10 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         const memoizedProps = node.memoizedProps as Record<string, unknown> | undefined;
         const contextValue = memoizedProps?.value;
 
-        if (isArcContextValue(contextValue)) {
+        if (isArcContextValueLocal(contextValue)) {
             const context = contextValue as Record<string, unknown>;
             const configuration = sanitize(context.configuration) as Record<string, unknown> | null;
-            const baseUrl = getConfiguredBaseUrl(configuration, pageOrigin) ?? pageOrigin;
+            const baseUrl = getConfiguredBaseUrlLocal(configuration, pageOrigin) ?? pageOrigin;
 
             return {
                 isArcApplication: true,
@@ -264,14 +267,14 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         const child = node.child;
         const sibling = node.sibling;
         const parent = node.return;
-        if (isObject(child) && !visited.has(child)) queue.push(child);
-        if (isObject(sibling) && !visited.has(sibling)) queue.push(sibling);
-        if (isObject(parent) && !visited.has(parent)) queue.push(parent);
+        if (isRecord(child) && !visited.has(child)) queue.push(child);
+        if (isRecord(sibling) && !visited.has(sibling)) queue.push(sibling);
+        if (isRecord(parent) && !visited.has(parent)) queue.push(parent);
     }
 
     return {
-        isArcApplication: looksLikeArcApplicationPath(pagePathname),
-        baseUrl: looksLikeArcApplicationPath(pagePathname) ? pageOrigin : null,
+        isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
+        baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
         pageOrigin,
         configuration: null,
         detectionMethod: 'path-fallback',

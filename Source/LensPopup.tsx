@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from 'primereact/button';
 import { Tooltip } from 'primereact/tooltip';
 import { JsonSchema } from './arc/introspection';
+import { buildContextRequestHeaders } from './shared/requestHeaders';
 import { ExtensionSettings } from './shared/types';
 import {
     DEFAULT_NAVIGATION_STATE,
@@ -17,7 +18,14 @@ import { SettingsView } from './settings/SettingsView';
 import { ContextView } from './context/ContextView';
 import { CommandsView } from './commands/CommandsView';
 import { QueriesView } from './queries/QueriesView';
-import { fetchArcDevelopmentSources, mergeArcSourcedSettings } from './settings/arcDevelopmentSources';
+import {
+    fetchArcDevelopmentSources,
+    fetchArcTenants,
+    fetchArcUsers,
+    mergeArcSourcedSettings,
+    mergeArcTenants,
+    mergeArcUsers,
+} from './settings/arcDevelopmentSources';
 import './lens-popup.css';
 
 type Tab = PopupTab;
@@ -43,6 +51,8 @@ export function LensPopup() {
     const [arcStatusHovered, setArcStatusHovered] = useState(false);
     const [saved, setSaved] = useState(false);
     const [identityDetailsSchema, setIdentityDetailsSchema] = useState<JsonSchema | undefined>(undefined);
+    const [settingsUsersRefreshing, setSettingsUsersRefreshing] = useState(false);
+    const [settingsTenantsRefreshing, setSettingsTenantsRefreshing] = useState(false);
     const hasArcContext = arcContext?.isArcApplication === true;
 
     const mergeAndPersistArcSources = async (snapshot: ArcContextSnapshot, currentSettings: ExtensionSettings): Promise<ExtensionSettings> => {
@@ -52,10 +62,27 @@ export function LensPopup() {
         }
 
         try {
-            const sources = await fetchArcDevelopmentSources(snapshot.baseUrl);
-            setIdentityDetailsSchema(sources.identityDetailsSchema);
+            const sources = await fetchArcDevelopmentSources(snapshot.baseUrl, {
+                headers: buildContextRequestHeaders(currentSettings),
+            });
+            if (sources.identityDetailsSchema) {
+                setIdentityDetailsSchema(sources.identityDetailsSchema);
+            }
+
+            console.info('[Lens][Settings] Full Arc refresh fetched', {
+                baseUrl: snapshot.baseUrl,
+                users: sources.users.length,
+                tenants: sources.tenants.length,
+                hasSchema: !!sources.identityDetailsSchema,
+            });
 
             const mergedSettings = mergeArcSourcedSettings(currentSettings, sources);
+            console.info('[Lens][Settings] Full Arc refresh merged', {
+                usersBefore: currentSettings.users.length,
+                usersAfter: mergedSettings.users.length,
+                tenantsBefore: currentSettings.tenants.length,
+                tenantsAfter: mergedSettings.tenants.length,
+            });
             if (JSON.stringify(currentSettings) !== JSON.stringify(mergedSettings)) {
                 setSettings(mergedSettings);
                 await saveSettings(mergedSettings);
@@ -63,9 +90,27 @@ export function LensPopup() {
 
             return mergedSettings;
         } catch {
-            setIdentityDetailsSchema(undefined);
             return currentSettings;
         }
+    };
+
+    const syncArcRoutingSettings = async (snapshot: ArcContextSnapshot, currentSettings: ExtensionSettings): Promise<ExtensionSettings> => {
+        const nextBaseUrl = snapshot.baseUrl ?? currentSettings.arcBaseUrl;
+        const nextPageOrigin = snapshot.pageOrigin ?? currentSettings.arcPageOrigin;
+
+        if (nextBaseUrl === currentSettings.arcBaseUrl && nextPageOrigin === currentSettings.arcPageOrigin) {
+            return currentSettings;
+        }
+
+        const updated = {
+            ...currentSettings,
+            arcBaseUrl: nextBaseUrl,
+            arcPageOrigin: nextPageOrigin,
+        };
+
+        setSettings(updated);
+        await saveSettings(updated);
+        return updated;
     };
 
     const refreshArcContext = async () => {
@@ -76,10 +121,93 @@ export function LensPopup() {
             setArcContext(freshSnapshot);
 
             if (settings) {
-                await mergeAndPersistArcSources(freshSnapshot, settings);
+                const withRouting = await syncArcRoutingSettings(freshSnapshot, settings);
+                await mergeAndPersistArcSources(freshSnapshot, withRouting);
             }
         } finally {
             setArcContextLoading(false);
+        }
+    };
+
+    const refreshUsers = async () => {
+        if (!settings) {
+            return;
+        }
+
+        setSettingsUsersRefreshing(true);
+        try {
+            if (!arcContext) {
+                await refreshArcContext();
+                return;
+            }
+
+            const freshSnapshot = await captureArcContextForActiveTab();
+            await saveArcContextSnapshot(freshSnapshot);
+            setArcContext(freshSnapshot);
+
+            if (!freshSnapshot.isArcApplication || !freshSnapshot.baseUrl) {
+                return;
+            }
+
+            const sources = await fetchArcUsers(freshSnapshot.baseUrl, {
+                headers: buildContextRequestHeaders(settings),
+            });
+            if (sources.identityDetailsSchema) {
+                setIdentityDetailsSchema(sources.identityDetailsSchema);
+            }
+
+            console.info('[Lens][Settings] Users refresh fetched', {
+                baseUrl: freshSnapshot.baseUrl,
+                users: sources.users.length,
+                hasSchema: !!sources.identityDetailsSchema,
+            });
+
+            const mergedSettings = mergeArcUsers(settings, sources.users);
+            console.info('[Lens][Settings] Users refresh merged', {
+                usersBefore: settings.users.length,
+                usersAfter: mergedSettings.users.length,
+            });
+            setSettings(mergedSettings);
+            await saveSettings(mergedSettings);
+        } finally {
+            setSettingsUsersRefreshing(false);
+        }
+    };
+
+    const refreshTenants = async () => {
+        if (!settings) {
+            return;
+        }
+
+        setSettingsTenantsRefreshing(true);
+        try {
+            if (!arcContext) {
+                await refreshArcContext();
+                return;
+            }
+
+            const freshSnapshot = await captureArcContextForActiveTab();
+            await saveArcContextSnapshot(freshSnapshot);
+            setArcContext(freshSnapshot);
+
+            if (!freshSnapshot.isArcApplication || !freshSnapshot.baseUrl) {
+                return;
+            }
+
+            const tenants = await fetchArcTenants(freshSnapshot.baseUrl, {
+                headers: buildContextRequestHeaders(settings),
+            });
+            const mergedSettings = mergeArcTenants(settings, tenants);
+            console.info('[Lens][Settings] Tenants refresh merged', {
+                baseUrl: freshSnapshot.baseUrl,
+                tenantsFetched: tenants.length,
+                tenantsBefore: settings.tenants.length,
+                tenantsAfter: mergedSettings.tenants.length,
+            });
+            setSettings(mergedSettings);
+            await saveSettings(mergedSettings);
+        } finally {
+            setSettingsTenantsRefreshing(false);
         }
     };
 
@@ -107,7 +235,8 @@ export function LensPopup() {
             const freshSnapshot = await captureArcContextForActiveTab();
             await saveArcContextSnapshot(freshSnapshot);
 
-            const resolvedSettings = await mergeAndPersistArcSources(freshSnapshot, loadedSettings);
+            const withRouting = await syncArcRoutingSettings(freshSnapshot, loadedSettings);
+            const resolvedSettings = await mergeAndPersistArcSources(freshSnapshot, withRouting);
 
             if (!cancelled) {
                 setArcContext(freshSnapshot);
@@ -256,7 +385,15 @@ export function LensPopup() {
 
                 <main className="view-panel">
                     {resolvedActiveTab === 'settings' && (
-                        <SettingsView settings={settings} onChange={handleChange} identityDetailsSchema={identityDetailsSchema} />
+                        <SettingsView
+                            settings={settings}
+                            onChange={handleChange}
+                            identityDetailsSchema={identityDetailsSchema}
+                            onRefreshUsers={() => void refreshUsers()}
+                            isRefreshingUsers={settingsUsersRefreshing}
+                            onRefreshTenants={() => void refreshTenants()}
+                            isRefreshingTenants={settingsTenantsRefreshing}
+                        />
                     )}
 
                     {resolvedActiveTab === 'context' && (

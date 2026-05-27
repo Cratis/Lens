@@ -9,6 +9,8 @@ interface Props {
     settings: ExtensionSettings;
     onChange: (settings: ExtensionSettings) => void;
     identityDetailsSchema?: JsonSchema;
+    onRefreshUsers: () => void;
+    isRefreshingUsers: boolean;
 }
 
 type Mode = 'list' | 'add' | 'edit' | 'view';
@@ -17,7 +19,7 @@ function getSource(user: UserProfile): 'custom' | 'arc' {
     return user.source === 'arc' ? 'arc' : 'custom';
 }
 
-export function UserList({ settings, onChange, identityDetailsSchema }: Props) {
+export function UserList({ settings, onChange, identityDetailsSchema, onRefreshUsers, isRefreshingUsers }: Props) {
     const [mode, setMode] = useState<Mode>('list');
     const [editUser, setEditUser] = useState<UserProfile | null>(null);
 
@@ -57,14 +59,31 @@ export function UserList({ settings, onChange, identityDetailsSchema }: Props) {
         <div className="stack-gap">
             <div className="panel-header">
                 <h3>User options</h3>
-                <Button
-                    label="Add user"
-                    icon="pi pi-plus"
-                    onClick={() => {
-                        setEditUser(null);
-                        setMode('add');
-                    }}
-                />
+                <div className="option-item-actions">
+                    <Button
+                        icon="pi pi-plus"
+                        rounded
+                        text
+                        aria-label="Add user"
+                        tooltip="Add user"
+                        tooltipOptions={{ position: 'left' }}
+                        onClick={() => {
+                            setEditUser(null);
+                            setMode('add');
+                        }}
+                    />
+                    <Button
+                        className="tree-refresh-button"
+                        icon={isRefreshingUsers ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                        rounded
+                        text
+                        disabled={isRefreshingUsers}
+                        aria-label="Refresh users from Arc"
+                        tooltip="Refresh users from Arc"
+                        tooltipOptions={{ position: 'left' }}
+                        onClick={onRefreshUsers}
+                    />
+                </div>
             </div>
 
             {settings.users.length === 0 && (

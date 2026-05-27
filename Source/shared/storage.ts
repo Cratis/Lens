@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     activeTenantId: '',
     tenantHeaderName: 'x-cratis-tenant-id',
     arcBaseUrl: 'http://localhost:5000',
+    arcPageOrigin: '',
 };
 
 function isObject(value: unknown): value is Record<string, unknown> {

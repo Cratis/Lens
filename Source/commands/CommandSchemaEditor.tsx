@@ -43,7 +43,24 @@ function getSchemaType(schema?: JsonSchema): string {
     if (!schema) {
         return 'object';
     }
-    if (schema.type) {
+    if (Array.isArray(schema.type)) {
+        if (schema.type.includes('object')) {
+            return 'object';
+        }
+        if (schema.type.includes('array')) {
+            return 'array';
+        }
+        if (schema.type.includes('boolean')) {
+            return 'boolean';
+        }
+        if (schema.type.includes('number') || schema.type.includes('integer')) {
+            return 'number';
+        }
+        if (schema.type.includes('string')) {
+            return 'string';
+        }
+    }
+    if (typeof schema.type === 'string') {
         return schema.type;
     }
     if (schema.properties) {

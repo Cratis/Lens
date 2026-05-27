@@ -8,9 +8,21 @@ interface Props {
     settings: ExtensionSettings | null;
     onChange: (settings: ExtensionSettings) => void;
     identityDetailsSchema?: JsonSchema;
+    onRefreshUsers: () => void;
+    isRefreshingUsers: boolean;
+    onRefreshTenants: () => void;
+    isRefreshingTenants: boolean;
 }
 
-export function SettingsView({ settings, onChange, identityDetailsSchema }: Props) {
+export function SettingsView({
+    settings,
+    onChange,
+    identityDetailsSchema,
+    onRefreshUsers,
+    isRefreshingUsers,
+    onRefreshTenants,
+    isRefreshingTenants,
+}: Props) {
     if (!settings) {
         return <div className="loading">Loading settings...</div>;
     }
@@ -19,13 +31,22 @@ export function SettingsView({ settings, onChange, identityDetailsSchema }: Prop
         <div className="stack-gap page-layout">
             <section className="feature-card fill-widget">
                 <TabView className="sticky-tab-composition">
-                    <TabPanel header="User settings">
-                        <p className="feature-note">Arc-provided users are tagged and read-only. Custom users can be created and edited here.</p>
-                        <UserList settings={settings} onChange={onChange} identityDetailsSchema={identityDetailsSchema} />
+                    <TabPanel header="Users">
+                        <UserList
+                            settings={settings}
+                            onChange={onChange}
+                            identityDetailsSchema={identityDetailsSchema}
+                            onRefreshUsers={onRefreshUsers}
+                            isRefreshingUsers={isRefreshingUsers}
+                        />
                     </TabPanel>
-                    <TabPanel header="Tenant settings">
-                        <p className="feature-note">Arc-provided tenants are tagged and read-only. Custom tenants remain editable.</p>
-                        <TenantList settings={settings} onChange={onChange} />
+                    <TabPanel header="Tenants">
+                        <TenantList
+                            settings={settings}
+                            onChange={onChange}
+                            onRefreshTenants={onRefreshTenants}
+                            isRefreshingTenants={isRefreshingTenants}
+                        />
                     </TabPanel>
                 </TabView>
             </section>

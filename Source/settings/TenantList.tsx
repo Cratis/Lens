@@ -7,6 +7,8 @@ import { TenantForm } from './TenantForm';
 interface Props {
     settings: ExtensionSettings;
     onChange: (settings: ExtensionSettings) => void;
+    onRefreshTenants: () => void;
+    isRefreshingTenants: boolean;
 }
 
 type Mode = 'list' | 'add' | 'edit';
@@ -15,7 +17,7 @@ function getSource(tenant: Tenant): 'custom' | 'arc' {
     return tenant.source === 'arc' ? 'arc' : 'custom';
 }
 
-export function TenantList({ settings, onChange }: Props) {
+export function TenantList({ settings, onChange, onRefreshTenants, isRefreshingTenants }: Props) {
     const [mode, setMode] = useState<Mode | 'view'>('list');
     const [editTenant, setEditTenant] = useState<Tenant | null>(null);
 
@@ -54,14 +56,31 @@ export function TenantList({ settings, onChange }: Props) {
         <div className="stack-gap">
             <div className="panel-header">
                 <h3>Tenant options</h3>
-                <Button
-                    label="Add tenant"
-                    icon="pi pi-plus"
-                    onClick={() => {
-                        setEditTenant(null);
-                        setMode('add');
-                    }}
-                />
+                <div className="option-item-actions">
+                    <Button
+                        icon="pi pi-plus"
+                        rounded
+                        text
+                        aria-label="Add tenant"
+                        tooltip="Add tenant"
+                        tooltipOptions={{ position: 'left' }}
+                        onClick={() => {
+                            setEditTenant(null);
+                            setMode('add');
+                        }}
+                    />
+                    <Button
+                        className="tree-refresh-button"
+                        icon={isRefreshingTenants ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                        rounded
+                        text
+                        disabled={isRefreshingTenants}
+                        aria-label="Refresh tenants from Arc"
+                        tooltip="Refresh tenants from Arc"
+                        tooltipOptions={{ position: 'left' }}
+                        onClick={onRefreshTenants}
+                    />
+                </div>
             </div>
 
             {settings.tenants.length === 0 && (
