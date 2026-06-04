@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "Lens - Cratis Developer Tools",
-    "version": "0.1.0",
+    "name": "Cratis Lens",
+    "version": "1.0.0",
     "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
     "permissions": [
         "storage",
