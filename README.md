@@ -1,4 +1,4 @@
-# Lens — Cratis Arc Developer Productivity Extension
+# Lens — Cratis Developer Productivity Extension
 
 **Lens** is a browser extension for developers using the **Cratis Stack**
 (Cratis Arc + Cratis Chronicle). It streamlines development and testing by
