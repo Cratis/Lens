@@ -36,22 +36,26 @@ We use the information collected to:
 ## 3. Data Storage and Security
 
 ### 3.1 Local Storage
+
 - Your data is stored locally on your device using Chrome's storage APIs
 - We implement industry-standard security practices to protect stored data
 - You maintain full control over your local data and can clear it at any time through Chrome's settings
 
 ### 3.2 Data Transmission
+
 - Data is only transmitted to external services when you explicitly configure the Extension to connect to a Cratis Arc backend
 - All communication with external services should occur over secure (HTTPS) connections
 - We do not sell, trade, or rent your personal information to third parties
 
 ### 3.3 Cratis Arc Backend Communication
+
 - If you configure the Extension to connect to a Cratis Arc service, that service's privacy policy will govern the handling of data transmitted to it
 - You are responsible for reviewing the privacy policy of your Cratis Arc service provider
 
 ## 4. Third-Party Services
 
 The Extension may communicate with:
+
 - Your configured Cratis Arc backend service (if applicable)
 - Chrome APIs for storage and browser integration
 
@@ -60,6 +64,7 @@ We do not intentionally share your information with unaffiliated third parties.
 ## 5. Your Privacy Rights and Controls
 
 ### 5.1 Data Access and Control
+
 - You have full control over what data the Extension can access on your device
 - All data stored by the Extension is stored locally and can be deleted at any time by:
   - Clearing the Extension's data through Chrome's Site Settings
@@ -67,10 +72,12 @@ We do not intentionally share your information with unaffiliated third parties.
   - Using Chrome's "Clear browsing data" feature
 
 ### 5.2 Permissions
+
 - The Extension requests specific Chrome permissions to function. You can review these in the Chrome Extension Details page
 - Revoking any permissions will limit the Extension's functionality accordingly
 
 ### 5.3 Chrome Sync
+
 - If you use Chrome's sync features, some Extension data may be synced across your Chrome browsers
 - This sync is controlled by your Chrome account settings
 
@@ -91,6 +98,7 @@ If you have questions about this Privacy Policy, our privacy practices, or wish 
 ## 9. Additional Information
 
 ### 9.1 Permissions Explanation
+
 The Extension requests the following Chrome permissions:
 
 - **storage:** To store your Extension settings and preferences locally on your device
@@ -99,10 +107,12 @@ The Extension requests the following Chrome permissions:
 - **Host Permissions (<all_urls>):** To allow the Extension to access web pages across all websites for providing developer tools and insights
 
 ### 9.2 Data Retention
+
 - Local data is retained as long as you use the Extension or until you manually delete it
 - Data transmitted to Cratis Arc services is retained according to that service's data retention policies
 
 ### 9.3 Compliance
+
 - This Extension complies with the Chrome Web Store policies regarding privacy and data collection
 - We are committed to maintaining the highest standards of privacy and data protection
 
