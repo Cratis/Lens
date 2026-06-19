@@ -324,8 +324,14 @@ export function mergeArcSourcedSettings(settings: ExtensionSettings, sources: Ar
     const customUsers = settings.users.filter(_ => _.source !== 'arc');
     const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
 
-    const users = [...customUsers, ...sources.users];
-    const tenants = [...customTenants, ...sources.tenants];
+    // A refresh whose fetch rejected returns an empty list (Promise.allSettled -> []). Keep the
+    // previously fetched arc entries in that case so a transient/failed refresh never wipes the
+    // active user/tenant selection.
+    const arcUsers = sources.users.length > 0 ? sources.users : settings.users.filter(_ => _.source === 'arc');
+    const arcTenants = sources.tenants.length > 0 ? sources.tenants : settings.tenants.filter(_ => _.source === 'arc');
+
+    const users = [...customUsers, ...arcUsers];
+    const tenants = [...customTenants, ...arcTenants];
 
     const activeUserId = users.some(_ => _.id === settings.activeUserId)
         ? settings.activeUserId
@@ -345,7 +351,9 @@ export function mergeArcSourcedSettings(settings: ExtensionSettings, sources: Ar
 
 export function mergeArcUsers(settings: ExtensionSettings, users: UserProfile[]): ExtensionSettings {
     const customUsers = settings.users.filter(_ => _.source !== 'arc');
-    const mergedUsers = [...customUsers, ...users];
+    // Preserve the prior arc users when a refresh returned none, so it never wipes the selection.
+    const arcUsers = users.length > 0 ? users : settings.users.filter(_ => _.source === 'arc');
+    const mergedUsers = [...customUsers, ...arcUsers];
 
     const activeUserId = mergedUsers.some(_ => _.id === settings.activeUserId)
         ? settings.activeUserId
@@ -360,7 +368,9 @@ export function mergeArcUsers(settings: ExtensionSettings, users: UserProfile[])
 
 export function mergeArcTenants(settings: ExtensionSettings, tenants: Tenant[]): ExtensionSettings {
     const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
-    const mergedTenants = [...customTenants, ...tenants];
+    // Preserve the prior arc tenants when a refresh returned none, so it never wipes the selection.
+    const arcTenants = tenants.length > 0 ? tenants : settings.tenants.filter(_ => _.source === 'arc');
+    const mergedTenants = [...customTenants, ...arcTenants];
 
     const activeTenantId = mergedTenants.some(_ => _.id === settings.activeTenantId)
         ? settings.activeTenantId

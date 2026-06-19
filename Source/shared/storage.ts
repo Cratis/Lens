@@ -86,12 +86,15 @@ function normalizeSettings(settings: Partial<ExtensionSettings>): ExtensionSetti
 }
 
 export async function getSettings(): Promise<ExtensionSettings> {
-    const data = await chrome.storage.sync.get('settings');
+    // Settings are device-local developer configuration. They live in storage.local, not storage.sync:
+    // the fetched user/tenant catalog can approach storage.sync's 8 KB-per-item cap, and a synced empty
+    // value from another device/profile must never overwrite the active selection.
+    const data = await chrome.storage.local.get('settings');
     return normalizeSettings((data.settings as Partial<ExtensionSettings>) ?? {});
 }
 
 export async function saveSettings(settings: ExtensionSettings): Promise<void> {
-    await chrome.storage.sync.set({ settings });
+    await chrome.storage.local.set({ settings });
 }
 
 export async function getNavigationState(): Promise<ExtensionNavigationState> {
