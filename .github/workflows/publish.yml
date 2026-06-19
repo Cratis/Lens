@@ -72,18 +72,16 @@ jobs:
           node-version: 23.x
 
       - uses: actions/cache@v3
-        id: yarn-cache
+        id: npm-cache
         with:
           path: |
-            .yarn/cache
-            **/node_modules
-            **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+            ~/.npm
+            Source/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('Source/package-lock.json') }}
 
-      - name: Yarn install
+      - name: Install dependencies
         working-directory: ./Source
-        run: yarn
+        run: npm install
 
       - name: Set extension version
         working-directory: ./Source
@@ -94,7 +92,7 @@ jobs:
 
       - name: Build
         working-directory: ./Source
-        run: yarn build
+        run: npm run build
 
       - name: Upload extension artifact
         uses: actions/upload-artifact@v4
@@ -116,7 +114,7 @@ jobs:
           path: dist/
 
       - name: Package extension
-        run: zip -r extension-chrome.zip dist/
+        run: cd dist && zip -r ../extension-chrome.zip .
 
       - name: Publish to Chrome Web Store
         uses: mnao305/chrome-extension-upload@v5.0.0
@@ -140,7 +138,7 @@ jobs:
           path: dist/
 
       - name: Package extension
-        run: zip -r extension-edge.zip dist/
+        run: cd dist && zip -r ../extension-edge.zip .
 
       - name: Publish to Microsoft Edge Add-ons
         uses: wdzeng/edge-addon@v2
@@ -166,18 +164,16 @@ jobs:
           node-version: 23.x
 
       - uses: actions/cache@v3
-        id: yarn-cache
+        id: npm-cache
         with:
           path: |
-            .yarn/cache
-            **/node_modules
-            **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+            ~/.npm
+            Source/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('Source/package-lock.json') }}
 
-      - name: Yarn install
+      - name: Install dependencies
         working-directory: ./Source
-        run: yarn
+        run: npm install
 
       - name: Download extension artifact
         uses: actions/download-artifact@v4
@@ -203,25 +199,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 23.x
-
-      - uses: actions/cache@v3
-        id: yarn-cache
-        with:
-          path: |
-            .yarn/cache
-            **/node_modules
-            **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
-
-      - name: Yarn install
-        working-directory: ./Source
-        run: yarn
 
       - name: Download extension artifact
         uses: actions/download-artifact@v4

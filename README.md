@@ -73,6 +73,13 @@ All headers are injected automatically into:
 Your backend receives properly authenticated and tenant-scoped requests, so you
 can test complex scenarios without manual header manipulation.
 
+### Identity Cookie Refresh
+
+When you change the active Lens user or tenant, Lens clears the Cratis Arc
+`.cratis-identity` cookie for the configured application/backend origins and
+reloads matching Arc app tabs. This prevents a stale development identity from
+remaining active after the selected context changes.
+
 ## Features at a Glance
 
 | Feature | Purpose |
@@ -112,8 +119,8 @@ Once installed, configure Lens to connect to your Cratis Arc backend:
 
 ```bash
 cd Source
-yarn install
-yarn build
+npm install
+npm run build
 ```
 
 This builds the extension into a directory that can be loaded into Chrome.
@@ -124,14 +131,15 @@ For active development with hot reload:
 
 ```bash
 cd Source
-yarn dev
+npm run dev
 ```
 
-### Run Tests
+### Run Checks
 
 ```bash
 cd Source
-yarn test
+npm run typecheck
+npm run build
 ```
 
 ## Project Structure
