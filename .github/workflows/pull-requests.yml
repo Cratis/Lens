@@ -42,11 +42,11 @@ jobs:
           path: |
             **/node_modules
             **/.eslintcache
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
 
       - name: NPM install
         working-directory: ./Source
-        run: npm ci
+        run: npm install
 
       - name: Build and verify
         working-directory: ./Source
