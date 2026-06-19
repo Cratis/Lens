@@ -37,19 +37,17 @@ jobs:
           node-version: 23.x
 
       - uses: actions/cache@v3
-        id: yarn-cache
+        id: npm-cache
         with:
           path: |
-            .yarn/cache
             **/node_modules
             **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
 
-      - name: Yarn install
+      - name: NPM install
         working-directory: ./Source
-        run: yarn
+        run: npm ci
 
       - name: Build and verify
         working-directory: ./Source
-        run: yarn ci
+        run: npm run typecheck && npm run build
