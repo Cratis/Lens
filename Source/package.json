@@ -27,5 +27,6 @@
         "typescript": "^7.0.2",
         "vite": "^8.0.10",
         "vite-plugin-web-extension": "^4.5.1"
-    }
+    },
+    "packageManager": "yarn@4.17.1"
 }
