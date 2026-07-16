@@ -1,174 +1,156 @@
-# Lens — Cratis Developer Productivity Extension
+<div align="center">
 
-**Lens** is a browser extension for developers using the **Cratis Stack**
-(Cratis Arc + Cratis Chronicle). It streamlines development and testing by
-letting you manage tenants, users, and test commands and queries directly
-from your browser — while automatically injecting the correct HTTP headers
-into your requests.
+# 🔍 Lens
 
-## What It Does
+**The developer's viewfinder for the Cratis Stack — become any user, step into any tenant, and fire commands and queries at your running app, straight from the browser.**
 
-Lens bridges the gap between your Cratis Arc application and your development
-workflow. Instead of manually crafting headers, switching contexts, or rebuilding
-code to test different tenant/user scenarios, Lens lets you:
+[![Discord](https://img.shields.io/discord/1182595891576717413?label=Discord&logo=discord&logoColor=white)](https://discord.gg/kt4AMpV8WV)
+[![Build](https://github.com/Cratis/Lens/actions/workflows/pull-requests.yml/badge.svg)](https://github.com/Cratis/Lens/actions/workflows/pull-requests.yml)
+[![Publish](https://github.com/Cratis/Lens/actions/workflows/publish.yml/badge.svg)](https://github.com/Cratis/Lens/actions/workflows/publish.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-### 🏢 Tenant Selector
+</div>
 
-Switch between different tenants on the fly. Lens automatically injects the correct
-tenancy header into all requests, making it simple to test multi-tenant behavior
-without restarting your application.
+---
 
-### 👤 User Selector
+On a film set, the **lens** is what the camera sees the scene through — swap it and the whole shot changes: a
+new angle, a tighter focus, a different depth of field. That's the idea. Lens is the lens you point at your
+running Cratis Arc application while you build it: watch it as a **different user**, from inside a **different
+tenant**, and focus right in on a single command or query to see exactly what the backend does — no rebuild,
+no hand-crafted headers, no leaving the page you're already on.
 
-Simulate requests from different users by selecting them from the extension UI.
-Your identity headers are automatically set, so your application routes requests
-with the correct user context.
+The friction it removes is real: no more pasting identity headers into a REST client, no more restarting the
+app to switch tenants, no more writing throwaway test harnesses just to see what a query returns.
 
-### 🧪 Command & Query Explorer
+## 🔍 Why "Lens"?
 
-Navigate, inspect, and execute commands and queries directly from the extension:
+Three reasons, and they all line up:
 
-- **Browse** all available commands and queries in your Cratis Arc application
-- **Test** commands by filling in parameters and seeing results in real-time
-- **Execute** queries and inspect response payloads
-- **Validate** your backend logic without writing test code
+- **The camera lens sets the point of view.** A cinematographer chooses the lens to decide what the audience
+  sees and how it's framed. Lens does the same for your app in development: choose the user, choose the tenant,
+  and every request is framed from that point of view.
+- **A lens is also what you inspect through.** Beyond the camera, a lens magnifies and focuses — it's an
+  instrument for *seeing clearly*. Lens brings your commands and queries under the glass so you can test them
+  and read back exactly what they return.
+- **The Cratis storytelling family.** Cratis names its products after telling a story: **Chronicle** records
+  what happened, **Arc** shapes the plot, **Screenplay** is the script, **Stage** performs it, **Studio**
+  storyboards it, **Narrator** reads it back… **Lens** is the camera you watch the rehearsal through. It joins
+  the cast.
 
-### 🔧 Development Context Management
+## 🎥 What a session looks like
 
-View and manage the current context (tenant, user, and other identity
-information) at a glance.
+Lens lives in your browser toolbar. Open the popup and you're directing the shot:
 
-## How It Works
+- **🏢 Pick a tenant** — the tenancy header is injected into every request; test multi-tenant behavior without
+  touching config or restarting.
+- **👤 Pick a user** — identity, claims, and permissions ride along, so the backend authorizes the request as
+  that person.
+- **🧪 Browse the cast** — Lens introspects the app's `/.cratis/commands` and `/.cratis/queries` endpoints and
+  lists every command and query, grouped by namespace; fill in parameters, fire it, and read the response
+  inline.
+- **🔧 Check the frame** — the current tenant, user, and identity context are always visible at a glance.
 
-### HTTP Header Injection
+Nothing about your frontend changes — Lens injects at the network boundary, transparently, only while the
+extension is active.
 
-Lens injects HTTP headers into requests made by your web application when the
-extension is active. This happens transparently — your frontend code doesn't
-need to change.
+## 🧠 How it works — header injection at the boundary
 
-#### Identity Headers
+When the extension is active, Lens rewrites the requests your web app makes, adding the headers your backend
+already expects. Your code is none the wiser:
 
-When you select a user, Lens injects headers following the
-[Cratis Arc Authentication specification](https://www.cratis.io/arc/backend/core/authentication/#microsoft-identity-platform-azure):
+```mermaid
+flowchart LR
+    You["🧑‍💻 you<br/>in the browser"] -->|"HTTP request"| Lens{{"🔍 Lens<br/>injects headers"}}
+    Ctx["🏢 tenant · 👤 user<br/>chosen in the popup"] -.->|"identity + tenancy<br/>headers"| Lens
+    Lens -->|"tenant-scoped,<br/>authenticated request"| Arc["⚙️ your Cratis Arc<br/>backend"]
+    Arc -->|"command / query result"| You
+```
 
-- Identity context headers that identify the current user
-- Claims and permissions that your backend uses for authorization
+- **Identity headers** — when you select a user, Lens injects the context, claims, and permissions your backend
+  reads for authorization, following the
+  [Cratis Arc authentication specification](https://www.cratis.io/arc/backend/core/authentication/#microsoft-identity-platform-azure).
+- **Tenancy headers** — when you select a tenant, Lens injects the tenant identifier that routes the request to
+  the right partition, following the
+  [Cratis Arc tenancy resolvers specification](https://www.cratis.io/arc/backend/tenancy/resolvers/).
+- **Automatic propagation** — the headers ride along on command execution, query requests, and any HTTP call
+  your app makes, so the backend always receives a properly authenticated, tenant-scoped request.
 
-#### Tenancy Headers
-
-When you select a tenant, Lens injects the tenancy header according to the
-[Cratis Arc Tenancy Resolvers specification](https://www.cratis.io/arc/backend/tenancy/resolvers/):
-
-- Tenant identifier headers that route requests to the correct tenant partition
-- Multi-tenant context information for your application
-
-### Automatic Context Propagation
-
-All headers are injected automatically into:
-
-- Command execution requests
-- Query requests
-- Any HTTP calls made by your application
-
-Your backend receives properly authenticated and tenant-scoped requests, so you
-can test complex scenarios without manual header manipulation.
-
-## Features at a Glance
+## ✨ Features at a glance
 
 | Feature | Purpose |
 | --- | --- |
-| **Tenant Selector** | Switch tenants instantly; header auto-injected |
-| **User Selector** | Simulate different users; identity headers |
-| **Arc Development Sources** | Configure local or remote Cratis Arc |
-| **Command Explorer** | Browse and execute backend commands |
-| **Query Explorer** | Run queries and inspect payloads |
-| **Context View** | See tenant, user, and identity context |
+| **🏢 Tenant Selector** | Switch tenants instantly; the tenancy header is auto-injected |
+| **👤 User Selector** | Simulate different users; identity, claims, and permissions follow |
+| **🔌 Arc Development Sources** | Point Lens at a local or remote Cratis Arc backend |
+| **🧪 Command Explorer** | Browse and execute backend commands with real parameters |
+| **🧪 Query Explorer** | Run queries and inspect the payloads that come back |
+| **🔧 Context View** | See the current tenant, user, and identity context |
 
-## Getting Started
+## 🚀 Quick start
 
-### Installation
-
-1. Clone or download the Lens repository
-2. Navigate to the `Source/` directory
-3. Build the extension (see [Development](#development) below)
-4. Load the built extension into Chrome:
-   - Open `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked"
-   - Select the built output directory
-
-### Configuration
-
-Once installed, configure Lens to connect to your Cratis Arc backend:
-
-1. Open the Lens extension popup
-2. Go to **Settings**
-3. Add your Arc Development Sources (local or remote endpoints)
-4. Set up users and tenants for your testing scenarios
-
-## Development
-
-### Build
+Build the extension and load it into Chrome:
 
 ```bash
 cd Source
 yarn install
-yarn build
+yarn build                 # bundles the unpacked extension into Source/dist/
 ```
 
-This builds the extension into a directory that can be loaded into Chrome.
+Then, in Chrome:
 
-### Development Server
+1. Open `chrome://extensions/`
+2. Enable **Developer mode**
+3. Click **Load unpacked** and select the `Source/dist` folder
+
+Now open your Cratis Arc app in the browser, open the Lens popup once so it detects the Arc context, then use
+**Settings** to add your **Arc Development Sources** (local or remote endpoints) and set up the users and
+tenants for your scenarios. The full walkthrough — including watch-mode development and release publishing — is
+in [`Documentation/GettingStarted`](Documentation/GettingStarted/index.md).
 
 For active development with hot reload:
 
 ```bash
 cd Source
-yarn dev
+yarn dev                   # Vite rebuilds on change; reload the extension after each build
+yarn test                  # run the specs
 ```
 
-### Run Tests
-
-```bash
-cd Source
-yarn test
-```
-
-## Project Structure
+## 🗺️ What's in this repo
 
 ```plaintext
 Source/
-├── manifest.json           # Extension manifest
-├── main.tsx / LensPopup.tsx # Main UI entry point
-├── background/             # Service worker for header injection
-├── commands/               # Command explorer functionality
-├── queries/                # Query explorer functionality
-├── settings/               # Configuration and tenant/user management
-├── context/                # Identity and tenancy context
-├── shared/                 # Shared utilities and types
-└── arc/                    # Cratis Arc integration
+├── manifest.json           # extension manifest (MV3)
+├── main.tsx / LensPopup.tsx # popup UI entry point
+├── background/             # service worker that injects headers
+├── commands/               # command explorer
+├── queries/                # query explorer
+├── settings/              # configuration, tenant/user management
+├── context/               # identity and tenancy context
+├── shared/                # shared utilities and types
+└── arc/                   # Cratis Arc integration
 ```
 
-## Why Lens?
+## ✅ Quality gates
 
-Working with Cratis Arc during development often means:
+```bash
+cd Source
+yarn typecheck   # zero TypeScript errors
+yarn build       # the extension builds clean
+yarn test        # all specs green
+```
 
-- Manually setting authentication headers to test different users
-- Rebuilding your app to change tenants
-- Writing inline tests for every command/query
-- Struggling to understand what data your backend returns
+## 🔗 Links
 
-**Lens eliminates this friction.** By bringing tenant/user management and
-command/query testing into your browser, you can focus on building features
-instead of setting up test harnesses.
-
-## Links
-
-- [Cratis Arc Documentation](https://www.cratis.io/arc/)
-- [Authentication & Identity](https://www.cratis.io/arc/backend/core/authentication/#microsoft-identity-platform-azure)
-- [Tenancy & Resolvers](https://www.cratis.io/arc/backend/tenancy/resolvers/)
+- [Cratis Arc documentation](https://www.cratis.io/arc/)
+- [Authentication & identity](https://www.cratis.io/arc/backend/core/authentication/#microsoft-identity-platform-azure)
+- [Tenancy & resolvers](https://www.cratis.io/arc/backend/tenancy/resolvers/)
 - [Cratis Chronicle](https://www.cratis.io/chronicle/)
+- [Privacy policy](PRIVACY_POLICY.md) — what Lens does and doesn't collect
 
-## License
+---
 
-See [LICENSE](LICENSE) file for details.
+<div align="center">
+
+*Part of the [Cratis](https://cratis.io) platform · Licensed under the [MIT license](LICENSE)*
+
+</div>
