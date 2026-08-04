@@ -89,7 +89,11 @@ export function LensPopup() {
             }
 
             return mergedSettings;
-        } catch {
+        } catch (error) {
+            // Never swallow this. It covers the persist as well as the fetch, so a storage rejection here is
+            // indistinguishable from an unreachable Arc host: both leave the popup showing a roster it did not
+            // keep, and the extension reads as signed out on the next open with nothing written anywhere.
+            console.error('[Lens][Settings] Full Arc refresh failed', error);
             return currentSettings;
         }
     };

@@ -10,6 +10,7 @@ export interface ExtensionNavigationState {
     queriesSelectedKey: string;
 }
 
+const SETTINGS_KEY = 'settings';
 const NAVIGATION_STATE_KEY = 'navigationState';
 
 export const DEFAULT_NAVIGATION_STATE: ExtensionNavigationState = {
@@ -85,13 +86,24 @@ function normalizeSettings(settings: Partial<ExtensionSettings>): ExtensionSetti
     };
 }
 
+// Settings live in chrome.storage.local, never chrome.storage.sync. Every profile is one object under one
+// key, and sync enforces QUOTA_BYTES_PER_ITEM = 8192 per key -- which a real Arc roster passes at the seventh
+// user, because each carries its own claims and identity details. Past that, set() rejects, nothing persists,
+// and the next read falls back to the defaults: the extension presents as signed out rather than as unable to
+// save. local is 10MB with no per-item cap, and impersonation settings are worth nothing on another machine.
 export async function getSettings(): Promise<ExtensionSettings> {
-    const data = await chrome.storage.sync.get('settings');
-    return normalizeSettings((data.settings as Partial<ExtensionSettings>) ?? {});
+    const data = await chrome.storage.local.get(SETTINGS_KEY);
+    if (data[SETTINGS_KEY] !== undefined) {
+        return normalizeSettings(data[SETTINGS_KEY] as Partial<ExtensionSettings>);
+    }
+
+    // Carry over a config small enough to have survived in sync, so upgrading keeps the roster it holds.
+    const legacy = await chrome.storage.sync.get(SETTINGS_KEY);
+    return normalizeSettings((legacy[SETTINGS_KEY] as Partial<ExtensionSettings>) ?? {});
 }
 
 export async function saveSettings(settings: ExtensionSettings): Promise<void> {
-    await chrome.storage.sync.set({ settings });
+    await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
 }
 
 export async function getNavigationState(): Promise<ExtensionNavigationState> {
