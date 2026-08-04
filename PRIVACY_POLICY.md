@@ -1,6 +1,6 @@
 # Privacy Policy for Cratis Lens
 
-**Last Updated:** June 19, 2026
+**Last Updated:** August 4, 2026
 
 ## Introduction
 
@@ -102,11 +102,11 @@ If you have questions about this Privacy Policy, our privacy practices, or wish 
 
 The Extension requests the following Chrome permissions:
 
-- **storage:** To store your Extension settings and preferences locally on your device
-- **scripting:** To run scripts on web pages to provide developer productivity features
-- **cookies:** To remove the Cratis Arc `.cratis-identity` cookie from configured Cratis Arc origins when the active Lens user or tenant changes, preventing stale development identity from being reused
-- **declarativeNetRequest & declarativeNetRequestWithHostAccess:** To apply network rules for the Extension's functionality
-- **Host Permissions (<all_urls>):** To support developer-configured local or remote Cratis Arc application origins and apply Lens functionality to matching web requests
+- **storage:** To store your Extension settings and preferences locally on your device, using `chrome.storage.local` only. The Extension does not use Chrome sync for its settings.
+- **scripting:** To inject a read-only detection script into the page you are inspecting, in order to determine whether it is a Cratis Arc application and to read its Arc configuration and observable-query diagnostics. The script runs only while the Lens popup is open, only against the tab you are viewing, and never modifies the page.
+- **cookies:** To remove the Cratis Arc `.cratis-identity` cookie from configured Cratis Arc origins when the active Lens user or tenant changes, preventing stale development identity from being reused. The Extension reads only that cookie's name and scope in order to remove it; it does not read, store, transmit, analyze, or share cookie values.
+- **declarativeNetRequest & declarativeNetRequestWithHostAccess:** To add the Cratis Arc identity and tenancy headers to matching requests. Rules are scoped to the detected Arc page origin or the configured Arc backend host; when neither is configured, the Extension installs no rules at all and adds no headers to any request.
+- **Host Permissions (<all_urls>):** To support developer-configured local or remote Cratis Arc application origins. This breadth is required because the Arc application under development can live on any origin the developer chooses; it is not used to observe general browsing.
 
 ### 9.2 Data Retention
 

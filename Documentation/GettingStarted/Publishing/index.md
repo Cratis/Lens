@@ -10,7 +10,7 @@ The publish workflow in
 does this:
 
 1. Runs the release step through `cratis/release-action@v1`.
-2. Builds the extension in `Source/` with npm on Node.js 23.
+2. Builds the extension in `Source/` with Yarn on Node.js 23.
 3. Uploads `Source/dist/` as the shared build artifact.
 4. Publishes Chrome, Edge, Firefox, and Safari releases when the release
    is not marked as a prerelease.
@@ -32,8 +32,8 @@ The workflow expects these local build commands to succeed:
 
 ```bash
 cd Source
-npm install
-npm run build
+yarn install
+yarn ci        # typecheck, specs and build — the same gate CI runs
 ```
 
 ## 1. Configure repository secrets
@@ -88,7 +88,7 @@ How to get them:
    - Copy the refresh token and store it as `CHROME_REFRESH_TOKEN`
 
 4. **Create extension in Chrome Web Store (requires .zip):**
-   - From the `Source/` directory, run `npm install && npm run build`
+   - From the `Source/` directory, run `yarn install && yarn build`
    - From the project root, run
      `cd Source/dist && zip -r ../../lens-extension.zip .`
    - This creates `lens-extension.zip` in the project root with
@@ -106,6 +106,14 @@ How to get them:
      inspecting Arc commands and queries and simulating tenant/user context.
    - Justify `storage` as local device storage for Lens settings,
      configured Arc sources, users, tenants, and popup navigation state.
+     Lens uses `chrome.storage.local` only — it does not use Chrome sync.
+   - Justify `scripting` as injecting a read-only detection script into the
+     inspected page to determine whether it is a Cratis Arc application and
+     to read its Arc configuration and observable-query diagnostics. The
+     script runs only when the popup is open, only on the tab the developer
+     is looking at, and only reads — it never modifies the page. It needs
+     the main world because the values it reads live on page-owned React
+     objects that an isolated content script cannot see.
    - Justify `cookies` as only being used to remove the Cratis Arc
      `.cratis-identity` cookie from configured Arc application or backend
      origins when the active Lens user or tenant changes. Lens does not
@@ -114,9 +122,10 @@ How to get them:
      `declarativeNetRequestWithHostAccess` as required to add Cratis Arc
      identity and tenant headers to matching XHR requests.
    - Justify `<all_urls>` as needed because developers can configure Lens
-     against arbitrary local or remote Cratis Arc application origins. Lens
-     scopes its rules to the configured page origin or Arc backend host when
-     possible.
+     against arbitrary local or remote Cratis Arc application origins.
+     Lens never installs a wildcard rule: header rules are scoped to the
+     detected Arc page origin, or to the configured Arc backend host, and
+     when neither is configured Lens installs no rules at all.
    - Make sure the dashboard privacy answers match
      [PRIVACY_POLICY.md](../../../PRIVACY_POLICY.md).
 
@@ -284,10 +293,10 @@ The build job uses:
 - `ubuntu-latest` for release, build, Chrome, Edge, and Firefox
 - `macos-latest` for Safari
 - Node.js `23.x`
-- npm in `Source/`
+- Yarn in `Source/` (pinned via `.yarnrc.yml` + the committed release binary)
 
 Before publishing, confirm that `Source/manifest.json` can safely have its
-version rewritten by the workflow and that `npm run build` produces a complete
+version rewritten by the workflow and that `yarn build` produces a complete
 `Source/dist/` folder.
 
 ## 6. Understand artifact packaging
@@ -325,7 +334,7 @@ job finishes.
 ## 8. Recommended setup checklist
 
 - Add all required store secrets before the first release
-- Validate `npm run build` locally from `Source/`
+- Validate `yarn build` locally from `Source/`
 - Confirm store credentials have publish rights, not just read access
 - Verify Safari signing assets are available to the macOS runner
 - Test with a prerelease first if you want to verify the release step

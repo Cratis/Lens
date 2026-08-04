@@ -87,6 +87,7 @@ flowchart LR
 | **🔌 Arc Development Sources** | Point Lens at a local or remote Cratis Arc backend |
 | **🧪 Command Explorer** | Browse and execute backend commands with real parameters |
 | **🧪 Query Explorer** | Run queries and inspect the payloads that come back |
+| **📈 Query Diagnostics** | Watch live observable-query health, transport, multiplexer and cache state |
 | **🔧 Context View** | See the current tenant, user, and identity context |
 
 ## 🚀 Quick start
@@ -128,19 +129,25 @@ Source/
 ├── background/             # service worker that injects headers
 ├── commands/               # command explorer
 ├── queries/                # query explorer
-├── settings/              # configuration, tenant/user management
-├── context/               # identity and tenancy context
-├── shared/                # shared utilities and types
-└── arc/                   # Cratis Arc integration
+├── observable-query-diagnostics/  # live observable-query health
+├── settings/               # configuration, tenant/user management
+├── context/                # identity and tenancy context
+├── shared/                 # shared utilities and types
+├── testing/                # spec helpers (chrome API stub, builders)
+└── arc/                    # Cratis Arc integration
 ```
+
+Specs sit next to what they specify, in `for_<Subject>/when_<context>.ts` folders — the same BDD shape as
+the rest of Cratis.
 
 ## ✅ Quality gates
 
 ```bash
 cd Source
 yarn typecheck   # zero TypeScript errors
-yarn build       # the extension builds clean
 yarn test        # all specs green
+yarn build       # the extension builds clean
+yarn ci          # all three, as CI runs them
 ```
 
 ## 🔗 Links
