@@ -297,11 +297,9 @@ storybook-static
 
 .pnp.*
 **/.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
+# The un-ignore patterns need the **/ prefix: a pattern containing a slash is anchored to this file's
+# directory, so a bare !.yarn/releases leaves Source/.yarn/releases ignored -- and the pinned release
+# binary yarnPath points at then never gets committed, which is what broke CI.
 !**/.yarn/patches
 !**/.yarn/plugins
 !**/.yarn/releases
