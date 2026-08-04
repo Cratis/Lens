@@ -24,8 +24,9 @@
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "^6.0.1",
-        "typescript": "^5.5.4",
+        "typescript": "^7.0.2",
         "vite": "^8.0.10",
         "vite-plugin-web-extension": "^4.5.1"
-    }
+    },
+    "packageManager": "yarn@4.17.1"
 }
