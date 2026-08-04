@@ -1,7 +1,11 @@
 name: Publish
 
+# Keyed by the pull request, never by a value that several simultaneously-closing pull requests share.
+# Merging a consolidation closes every pull request whose commits it carries; each of those fires its own
+# pull_request:closed event, and on a shared group cancel-in-progress means the last run to start cancels
+# the rest -- including the one that was supposed to cut the release. That is exactly what happened to #20.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 on:
@@ -40,6 +44,9 @@ permissions:
 
 jobs:
   release:
+    # A pull request closed without merging has nothing to release. Skipping early also keeps those runs
+    # from doing any work at all, on top of the concurrency key above keeping them out of each other's way.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.release.outputs.version }}

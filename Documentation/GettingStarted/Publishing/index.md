@@ -340,6 +340,24 @@ job finishes.
 - Test with a prerelease first if you want to verify the release step
   without publishing to stores
 
+## 9. Troubleshooting
+
+**The publish run was cancelled seconds after a merge.** Closing several pull
+requests at once — which is what merging a consolidation does, since GitHub
+closes every pull request whose commits it carries — starts one Publish run per
+closed pull request. The workflow's `concurrency` group is keyed by the pull
+request number so those runs cannot cancel each other; if you change that key,
+make sure it stays unique per pull request, or the last run to start will cancel
+the one that was meant to cut the release.
+
+**The release job ran but every store job was skipped.** That is the release
+action reporting `should-publish: false`. The most common cause is a merged pull
+request with no semantic version label — apply `major`, `minor`, or `patch`.
+
+**A store job failed with a credentials error.** Check that every secret in
+section 1 exists. A missing secret is not reported until the store job itself
+runs, so the release and build jobs succeed first and the failure looks late.
+
 ## Related files
 
 - [.github/workflows/publish.yml](../../.github/workflows/publish.yml)
