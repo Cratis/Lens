@@ -29,15 +29,18 @@ function getIdentityCookieUrls(target: IdentityCookieTarget): string[] {
         .filter((value, index, values) => values.indexOf(value) === index);
 }
 
-function getUrlForCookie(cookie: chrome.cookies.Cookie, fallbackUrl: string): string {
+// The cookie came back from getAll({ url }), so it is by definition readable from that origin -- keep the
+// origin exactly as configured, port included, and narrow only the path to the one the cookie is scoped to.
+// Rebuilding the URL from cookie.domain instead loses the port, and promoting the scheme to https for a
+// Secure cookie actively breaks local development: Chrome treats http://localhost as trustworthy and lets
+// Arc set a Secure .cratis-identity there, so the removal would be aimed at an origin it never lived on.
+function getUrlForCookie(cookie: chrome.cookies.Cookie, originUrl: string): string {
     try {
-        const fallback = new URL(fallbackUrl);
-        const protocol = cookie.secure ? 'https:' : fallback.protocol;
-        const domain = cookie.domain.startsWith('.') ? cookie.domain.substring(1) : cookie.domain;
-        const path = cookie.path || '/';
-        return `${protocol}//${domain}${path}`;
+        const url = new URL(originUrl);
+        url.pathname = cookie.path || '/';
+        return url.toString();
     } catch {
-        return fallbackUrl;
+        return originUrl;
     }
 }
 
