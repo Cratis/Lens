@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from 'primereact/button';
-import { captureObservableQueryDiagnosticsForActiveTab, ObservableQueryDiagnosticsSnapshot } from '../shared/arc-context';
+import { captureObservableQueryDiagnosticsForActiveTab, ObservableQueryDiagnosticsSnapshot } from './diagnosticsCapture';
 import { CacheSection } from './CacheSection';
 import { HealthSection } from './HealthSection';
 import { MultiplexerSection } from './MultiplexerSection';

@@ -1,4 +1,4 @@
-import { MultiplexerDiagnostics } from '../shared/arc-context';
+import { MultiplexerDiagnostics } from './diagnosticsCapture';
 import { DiagnosticsBadge, DiagnosticsRow, DiagnosticsSection, DiagnosticsValue } from './DiagnosticsSection';
 
 export function MultiplexerSection({ multiplexer }: { multiplexer: MultiplexerDiagnostics }) {

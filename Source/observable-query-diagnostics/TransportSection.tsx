@@ -1,4 +1,4 @@
-import { TransportDiagnostics } from '../shared/arc-context';
+import { TransportDiagnostics } from './diagnosticsCapture';
 import { DiagnosticsRow, DiagnosticsSection, DiagnosticsValue } from './DiagnosticsSection';
 
 export function TransportSection({ transport }: { transport: TransportDiagnostics }) {
