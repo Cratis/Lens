@@ -1,3 +1,4 @@
+import { clearIdentityCookies } from '../shared/identity-cache';
 import { getSettings } from '../shared/storage';
 import { ExtensionSettings, UserProfile } from '../shared/types';
 
@@ -69,15 +70,19 @@ function buildCondition(settings: ExtensionSettings): chrome.declarativeNetReque
     };
 }
 
-async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
-    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeRuleIds = existingRules.map(r => r.id);
+async function updateHeaderRules(): Promise<void> {
+    const [settings, existingRules, existingSessionRules] = await Promise.all([
+        getSettings(),
+        chrome.declarativeNetRequest.getDynamicRules(),
+        chrome.declarativeNetRequest.getSessionRules(),
+    ]);
+    const removeRuleIds = existingRules.map(rule => rule.id);
 
     const addRules: chrome.declarativeNetRequest.Rule[] = [];
     const condition = buildCondition(settings);
 
-    const user = settings.users.find(u => u.id === settings.activeUserId);
-    const tenant = settings.tenants.find(t => t.id === settings.activeTenantId);
+    const user = settings.users.find(userProfile => userProfile.id === settings.activeUserId);
+    const tenant = settings.tenants.find(candidate => candidate.id === settings.activeTenantId);
 
     if (condition && user) {
         addRules.push({
@@ -129,24 +134,101 @@ async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
         });
     }
 
-    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+    if (existingSessionRules.length > 0) {
+        await chrome.declarativeNetRequest.updateSessionRules({
+            removeRuleIds: existingSessionRules.map(rule => rule.id),
+        });
+    }
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds,
+        addRules,
+    });
 }
 
-chrome.storage.onChanged.addListener(async (changes) => {
-    if ('settings' in changes) {
-        const newSettings = changes['settings'].newValue as ExtensionSettings;
-        await updateHeaderRules(newSettings);
+function didGlobalSelectionChange(previous: ExtensionSettings | undefined, next: ExtensionSettings | undefined): boolean {
+    if (!previous || !next) {
+        return false;
     }
+
+    return previous.activeUserId !== next.activeUserId ||
+        previous.activeTenantId !== next.activeTenantId;
+}
+
+function getOrigin(value: string | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
+    try {
+        return new URL(value).origin;
+    } catch {
+        return null;
+    }
+}
+
+async function reloadTab(tabId: number): Promise<void> {
+    try {
+        await chrome.tabs.reload(tabId);
+    } catch (error) {
+        console.warn('[Lens][Context] Could not reload tab after context change', {
+            tabId,
+            error: String(error),
+        });
+    }
+}
+
+async function invalidateGlobalContext(previous: ExtensionSettings | undefined, next: ExtensionSettings | undefined): Promise<void> {
+    if (!didGlobalSelectionChange(previous, next) || !next) {
+        return;
+    }
+
+    const expectedOrigins = [
+        getOrigin(next.arcPageOrigin),
+        getOrigin(next.arcBaseUrl),
+    ].filter((_) : _ is string => _ !== null);
+
+    await clearIdentityCookies({
+        arcBaseUrl: next.arcBaseUrl,
+        arcPageOrigin: next.arcPageOrigin,
+    });
+
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.map(async tab => {
+        if (!tab.id || !tab.url) {
+            return;
+        }
+
+        const tabOrigin = getOrigin(tab.url);
+        if (!tabOrigin || !expectedOrigins.includes(tabOrigin)) {
+            return;
+        }
+
+        await reloadTab(tab.id);
+    }));
+}
+
+async function handleStorageChanged(
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string): Promise<void> {
+    if (areaName === 'local' && 'settings' in changes) {
+        await updateHeaderRules();
+        await invalidateGlobalContext(
+            changes.settings.oldValue as ExtensionSettings | undefined,
+            changes.settings.newValue as ExtensionSettings | undefined);
+    }
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    void handleStorageChanged(changes, areaName);
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-    const settings = await getSettings();
-    await updateHeaderRules(settings);
+    await updateHeaderRules();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-    const settings = await getSettings();
-    await updateHeaderRules(settings);
+    await updateHeaderRules();
 });
 
 export {};

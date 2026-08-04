@@ -74,6 +74,9 @@ flowchart LR
   [Cratis Arc tenancy resolvers specification](https://www.cratis.io/arc/backend/tenancy/resolvers/).
 - **Automatic propagation** — the headers ride along on command execution, query requests, and any HTTP call
   your app makes, so the backend always receives a properly authenticated, tenant-scoped request.
+- **A clean cut on every switch** — headers alone don't change who you are once the backend has issued a
+  session. Changing the active user or tenant clears the Arc `.cratis-identity` cookie on the configured
+  origins and reloads the matching tabs, so the next request is authenticated as the person you just picked.
 
 ## ✨ Features at a glance
 
@@ -113,6 +116,7 @@ For active development with hot reload:
 cd Source
 yarn dev                   # Vite rebuilds on change; reload the extension after each build
 yarn test                  # run the specs
+yarn ci                    # typecheck, specs and build — the same gate CI runs
 ```
 
 ## 🗺️ What's in this repo

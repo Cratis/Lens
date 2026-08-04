@@ -10,7 +10,7 @@ The publish workflow in
 does this:
 
 1. Runs the release step through `cratis/release-action@v1`.
-2. Builds the extension in `Source/` with Yarn on Node.js 23.
+2. Builds the extension in `Source/` with npm on Node.js 23.
 3. Uploads `Source/dist/` as the shared build artifact.
 4. Publishes Chrome, Edge, Firefox, and Safari releases when the release
    is not marked as a prerelease.
@@ -32,8 +32,8 @@ The workflow expects these local build commands to succeed:
 
 ```bash
 cd Source
-yarn
-yarn build
+npm install
+npm run build
 ```
 
 ## 1. Configure repository secrets
@@ -88,8 +88,11 @@ How to get them:
    - Copy the refresh token and store it as `CHROME_REFRESH_TOKEN`
 
 4. **Create extension in Chrome Web Store (requires .zip):**
-   - From the `Source/` directory, run `yarn build-package`
-   - This creates `lens-extension.zip` in the project root
+   - From the `Source/` directory, run `npm install && npm run build`
+   - From the project root, run
+     `cd Source/dist && zip -r ../../lens-extension.zip .`
+   - This creates `lens-extension.zip` in the project root with
+     `manifest.json` at the archive root
    - Go to [Chrome Web Store Developer Dashboard]
      (<https://chrome.google.com/webstore/devconsole>)
    - Click **New item** or **Create** to start a new extension
@@ -97,6 +100,25 @@ How to get them:
    - Once created, copy the extension ID from the dashboard or from the
      published item URL
    - Store it as `CHROME_EXTENSION_ID`
+
+5. **Complete Chrome Web Store privacy fields:**
+   - The single purpose should describe Lens as a Cratis developer tool for
+     inspecting Arc commands and queries and simulating tenant/user context.
+   - Justify `storage` as local device storage for Lens settings,
+     configured Arc sources, users, tenants, and popup navigation state.
+   - Justify `cookies` as only being used to remove the Cratis Arc
+     `.cratis-identity` cookie from configured Arc application or backend
+     origins when the active Lens user or tenant changes. Lens does not
+     store, transmit, analyze, or share cookie values.
+   - Justify `declarativeNetRequest` and
+     `declarativeNetRequestWithHostAccess` as required to add Cratis Arc
+     identity and tenant headers to matching XHR requests.
+   - Justify `<all_urls>` as needed because developers can configure Lens
+     against arbitrary local or remote Cratis Arc application origins. Lens
+     scopes its rules to the configured page origin or Arc backend host when
+     possible.
+   - Make sure the dashboard privacy answers match
+     [PRIVACY_POLICY.md](../../../PRIVACY_POLICY.md).
 
 ### Microsoft Edge Add-ons
 
@@ -155,7 +177,7 @@ How to get them:
 - `FIREFOX_API_KEY`
 - `FIREFOX_API_SECRET`
 
-These are passed to `yarn dlx web-ext sign` for signing and
+These are passed to `npx web-ext sign` for signing and
 publishing the extension.
 
 How to get them:
@@ -262,10 +284,10 @@ The build job uses:
 - `ubuntu-latest` for release, build, Chrome, Edge, and Firefox
 - `macos-latest` for Safari
 - Node.js `23.x`
-- Yarn in `Source/`
+- npm in `Source/`
 
 Before publishing, confirm that `Source/manifest.json` can safely have its
-version rewritten by the workflow and that `yarn build` produces a complete
+version rewritten by the workflow and that `npm run build` produces a complete
 `Source/dist/` folder.
 
 ## 6. Understand artifact packaging
@@ -275,9 +297,9 @@ The build job uploads `Source/dist/` as an artifact named
 
 The store-specific jobs then package that artifact like this:
 
-- Chrome downloads to `dist/` and zips `dist/` into
+- Chrome downloads to `dist/` and zips the contents into
   `extension-chrome.zip`
-- Edge downloads to `dist/` and zips `dist/` into `extension-edge.zip`
+- Edge downloads to `dist/` and zips the contents into `extension-edge.zip`
 - Firefox downloads to `Source/dist/` and signs the unpacked folder with
   `web-ext`
 - Safari downloads to `Source/dist/` and converts that folder into an Xcode
@@ -303,7 +325,7 @@ job finishes.
 ## 8. Recommended setup checklist
 
 - Add all required store secrets before the first release
-- Validate `yarn build` locally from `Source/`
+- Validate `npm run build` locally from `Source/`
 - Confirm store credentials have publish rights, not just read access
 - Verify Safari signing assets are available to the macOS runner
 - Test with a prerelease first if you want to verify the release step

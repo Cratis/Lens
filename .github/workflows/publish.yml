@@ -116,7 +116,7 @@ jobs:
           path: dist/
 
       - name: Package extension
-        run: zip -r extension-chrome.zip dist/
+        run: cd dist && zip -r ../extension-chrome.zip .
 
       - name: Publish to Chrome Web Store
         uses: mnao305/chrome-extension-upload@v5.0.0
@@ -140,7 +140,7 @@ jobs:
           path: dist/
 
       - name: Package extension
-        run: zip -r extension-edge.zip dist/
+        run: cd dist && zip -r ../extension-edge.zip .
 
       - name: Publish to Microsoft Edge Add-ons
         uses: wdzeng/edge-addon@v2
@@ -165,20 +165,8 @@ jobs:
         with:
           node-version: 23.x
 
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: |
-            .yarn/cache
-            **/node_modules
-            **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
-
-      - name: Yarn install
-        working-directory: ./Source
-        run: yarn
-
+      # No dependency install here: web-ext is not a project dependency, npx fetches it on demand,
+      # and this job only signs the already-built artifact.
       - name: Download extension artifact
         uses: actions/download-artifact@v4
         with:
@@ -204,25 +192,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 23.x
-
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: |
-            .yarn/cache
-            **/node_modules
-            **/.eslintcache
-            **/yarn.lock
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}
-
-      - name: Yarn install
-        working-directory: ./Source
-        run: yarn
-
+      # Safari packaging is pure Xcode tooling against the built artifact -- no Node, no dependencies.
       - name: Download extension artifact
         uses: actions/download-artifact@v4
         with:
