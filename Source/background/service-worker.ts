@@ -21,16 +21,19 @@ function buildClientPrincipal(user: UserProfile): string {
     return btoa(JSON.stringify(principal));
 }
 
-function buildUrlFilter(settings: ExtensionSettings): string {
-    if (settings.arcBaseUrl) {
-        try {
-            const url = new URL(settings.arcBaseUrl);
-            return `||${url.host}`;
-        } catch {
-            // fall through to wildcard
-        }
+// Null when no usable Arc host is configured, and the caller then installs no rules at all. Never fall back to
+// a wildcard: host_permissions is <all_urls>, so a '*' filter attaches the impersonation headers to every XHR
+// to every site the user browses. An unconfigured dev tool must do nothing, not broadcast an identity.
+function buildUrlFilter(settings: ExtensionSettings): string | null {
+    if (!settings.arcBaseUrl) {
+        return null;
     }
-    return '*';
+
+    try {
+        return `||${new URL(settings.arcBaseUrl).host}`;
+    } catch {
+        return null;
+    }
 }
 
 function getHost(url: string): string | null {
@@ -41,7 +44,7 @@ function getHost(url: string): string | null {
     }
 }
 
-function buildCondition(settings: ExtensionSettings): chrome.declarativeNetRequest.RuleCondition {
+function buildCondition(settings: ExtensionSettings): chrome.declarativeNetRequest.RuleCondition | null {
     const initiatorHost = settings.arcPageOrigin ? getHost(settings.arcPageOrigin) : null;
     if (initiatorHost) {
         return {
@@ -54,6 +57,10 @@ function buildCondition(settings: ExtensionSettings): chrome.declarativeNetReque
     }
 
     const urlFilter = buildUrlFilter(settings);
+    if (!urlFilter) {
+        return null;
+    }
+
     return {
         urlFilter,
         resourceTypes: [
@@ -72,7 +79,7 @@ async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
     const user = settings.users.find(u => u.id === settings.activeUserId);
     const tenant = settings.tenants.find(t => t.id === settings.activeTenantId);
 
-    if (user) {
+    if (condition && user) {
         addRules.push({
             id: RULE_USER_HEADERS,
             priority: 1,
@@ -102,7 +109,7 @@ async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
         });
     }
 
-    if (tenant && settings.tenantHeaderName) {
+    if (condition && tenant && settings.tenantHeaderName) {
         addRules.push({
             id: RULE_TENANT_HEADER,
             priority: 1,
