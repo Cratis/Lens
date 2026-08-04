@@ -164,10 +164,11 @@ export function LensPopup() {
             console.info('[Lens][Settings] Users refresh fetched', {
                 baseUrl: freshSnapshot.baseUrl,
                 users: sources.users.length,
+                usersFailed: sources.usersFailed,
                 hasSchema: !!sources.identityDetailsSchema,
             });
 
-            const mergedSettings = mergeArcUsers(settings, sources.users);
+            const mergedSettings = mergeArcUsers(settings, sources);
             console.info('[Lens][Settings] Users refresh merged', {
                 usersBefore: settings.users.length,
                 usersAfter: mergedSettings.users.length,
@@ -199,13 +200,14 @@ export function LensPopup() {
                 return;
             }
 
-            const tenants = await fetchArcTenants(freshSnapshot.baseUrl, {
+            const tenantSources = await fetchArcTenants(freshSnapshot.baseUrl, {
                 headers: buildContextRequestHeaders(settings),
             });
-            const mergedSettings = mergeArcTenants(settings, tenants);
+            const mergedSettings = mergeArcTenants(settings, tenantSources);
             console.info('[Lens][Settings] Tenants refresh merged', {
                 baseUrl: freshSnapshot.baseUrl,
-                tenantsFetched: tenants.length,
+                tenantsFetched: tenantSources.tenants.length,
+                tenantsFailed: tenantSources.tenantsFailed,
                 tenantsBefore: settings.tenants.length,
                 tenantsAfter: mergedSettings.tenants.length,
             });
