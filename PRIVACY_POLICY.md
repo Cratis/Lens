@@ -1,6 +1,6 @@
 # Privacy Policy for Cratis Lens
 
-**Last Updated:** June 6, 2026
+**Last Updated:** August 4, 2026
 
 ## Introduction
 
@@ -10,18 +10,19 @@ Cratis Lens ("Extension," "we," "us," or "our") is committed to protecting your 
 
 ### 1.1 Automatically Collected Information
 
-- **Local Storage:** The Extension stores user settings, preferences, and configuration data locally on your device using browser storage mechanisms (localStorage, sessionStorage). This data is stored solely on your device and is not transmitted to our servers unless explicitly configured.
-- **Extension Runtime Information:** We may collect non-personal technical information such as extension version, Chrome version, and browser settings to improve functionality and compatibility.
+- **Local Storage:** The Extension stores user settings, preferences, and configuration data locally on your device using Chrome storage APIs. This data is device-local and is not transmitted to our servers unless explicitly configured.
+- **Extension Runtime Information:** The Extension may read non-personal technical information such as extension version, Chrome version, and browser settings to provide functionality and maintain compatibility. This information is not transmitted to Cratis unless you explicitly configure a feature that sends data to a Cratis Arc backend.
 
 ### 1.2 Information You Provide
 
-- **Configuration and Preferences:** When you configure the Extension (such as connecting to a Cratis Arc backend or setting preferences), this information is stored locally unless you choose to sync it across devices using Chrome's sync features.
+- **Configuration and Preferences:** When you configure the Extension, such as connecting to a Cratis Arc backend or setting preferences, this information is stored locally on your device.
 - **Authentication Credentials:** If the Extension requires connection to a Cratis Arc backend service, any authentication tokens or credentials you provide are handled according to the privacy policy of your Cratis Arc service provider.
 
 ### 1.3 Information from Web Pages
 
 - **Web Content Interaction:** The Extension may access content from web pages you visit to provide developer productivity tools and insights. This access is limited to the functionality you explicitly request and is not transmitted to external servers unless required for features you enable.
 - **Page Metadata:** The Extension may collect metadata about pages you visit (such as URLs, page titles) solely for providing extension features and enabling developer tools within the context of the page.
+- **Cratis Arc Identity Cookies:** The Extension may access and remove the Cratis Arc `.cratis-identity` cookie on configured Cratis Arc application or backend origins when you change the active Lens user or tenant. Cookie values are not stored, transmitted, analyzed, or shared by the Extension.
 
 ## 2. How We Use Your Information
 
@@ -46,6 +47,7 @@ We use the information collected to:
 - Data is only transmitted to external services when you explicitly configure the Extension to connect to a Cratis Arc backend
 - All communication with external services should occur over secure (HTTPS) connections
 - We do not sell, trade, or rent your personal information to third parties
+- The Extension does not transmit cookie values to Cratis or any third party
 
 ### 3.3 Cratis Arc Backend Communication
 
@@ -78,8 +80,7 @@ We do not intentionally share your information with unaffiliated third parties.
 
 ### 5.3 Chrome Sync
 
-- If you use Chrome's sync features, some Extension data may be synced across your Chrome browsers
-- This sync is controlled by your Chrome account settings
+- The Extension stores Lens settings in Chrome's local extension storage and does not use Chrome sync for Lens settings
 
 ## 6. Children's Privacy
 
@@ -101,10 +102,11 @@ If you have questions about this Privacy Policy, our privacy practices, or wish 
 
 The Extension requests the following Chrome permissions:
 
-- **storage:** To store your Extension settings and preferences locally on your device
-- **scripting:** To run scripts on web pages to provide developer productivity features
-- **declarativeNetRequest & declarativeNetRequestWithHostAccess:** To apply network rules for the Extension's functionality
-- **Host Permissions (<all_urls>):** To allow the Extension to access web pages across all websites for providing developer tools and insights
+- **storage:** To store your Extension settings and preferences locally on your device, using `chrome.storage.local` only. The Extension does not use Chrome sync for its settings.
+- **scripting:** To inject a read-only detection script into the page you are inspecting, in order to determine whether it is a Cratis Arc application and to read its Arc configuration and observable-query diagnostics. The script runs only while the Lens popup is open, only against the tab you are viewing, and never modifies the page.
+- **cookies:** To remove the Cratis Arc `.cratis-identity` cookie from configured Cratis Arc origins when the active Lens user or tenant changes, preventing stale development identity from being reused. The Extension reads only that cookie's name and scope in order to remove it; it does not read, store, transmit, analyze, or share cookie values.
+- **declarativeNetRequest & declarativeNetRequestWithHostAccess:** To add the Cratis Arc identity and tenancy headers to matching requests. Rules are scoped to the detected Arc page origin or the configured Arc backend host; when neither is configured, the Extension installs no rules at all and adds no headers to any request.
+- **Host Permissions (<all_urls>):** To support developer-configured local or remote Cratis Arc application origins. This breadth is required because the Arc application under development can live on any origin the developer chooses; it is not used to observe general browsing.
 
 ### 9.2 Data Retention
 

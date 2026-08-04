@@ -32,8 +32,8 @@ The workflow expects these local build commands to succeed:
 
 ```bash
 cd Source
-yarn
-yarn build
+yarn install
+yarn ci        # typecheck, specs and build — the same gate CI runs
 ```
 
 ## 1. Configure repository secrets
@@ -88,8 +88,11 @@ How to get them:
    - Copy the refresh token and store it as `CHROME_REFRESH_TOKEN`
 
 4. **Create extension in Chrome Web Store (requires .zip):**
-   - From the `Source/` directory, run `yarn build-package`
-   - This creates `lens-extension.zip` in the project root
+   - From the `Source/` directory, run `yarn install && yarn build`
+   - From the project root, run
+     `cd Source/dist && zip -r ../../lens-extension.zip .`
+   - This creates `lens-extension.zip` in the project root with
+     `manifest.json` at the archive root
    - Go to [Chrome Web Store Developer Dashboard]
      (<https://chrome.google.com/webstore/devconsole>)
    - Click **New item** or **Create** to start a new extension
@@ -97,6 +100,34 @@ How to get them:
    - Once created, copy the extension ID from the dashboard or from the
      published item URL
    - Store it as `CHROME_EXTENSION_ID`
+
+5. **Complete Chrome Web Store privacy fields:**
+   - The single purpose should describe Lens as a Cratis developer tool for
+     inspecting Arc commands and queries and simulating tenant/user context.
+   - Justify `storage` as local device storage for Lens settings,
+     configured Arc sources, users, tenants, and popup navigation state.
+     Lens uses `chrome.storage.local` only — it does not use Chrome sync.
+   - Justify `scripting` as injecting a read-only detection script into the
+     inspected page to determine whether it is a Cratis Arc application and
+     to read its Arc configuration and observable-query diagnostics. The
+     script runs only when the popup is open, only on the tab the developer
+     is looking at, and only reads — it never modifies the page. It needs
+     the main world because the values it reads live on page-owned React
+     objects that an isolated content script cannot see.
+   - Justify `cookies` as only being used to remove the Cratis Arc
+     `.cratis-identity` cookie from configured Arc application or backend
+     origins when the active Lens user or tenant changes. Lens does not
+     store, transmit, analyze, or share cookie values.
+   - Justify `declarativeNetRequest` and
+     `declarativeNetRequestWithHostAccess` as required to add Cratis Arc
+     identity and tenant headers to matching XHR requests.
+   - Justify `<all_urls>` as needed because developers can configure Lens
+     against arbitrary local or remote Cratis Arc application origins.
+     Lens never installs a wildcard rule: header rules are scoped to the
+     detected Arc page origin, or to the configured Arc backend host, and
+     when neither is configured Lens installs no rules at all.
+   - Make sure the dashboard privacy answers match
+     [PRIVACY_POLICY.md](../../../PRIVACY_POLICY.md).
 
 ### Microsoft Edge Add-ons
 
@@ -155,7 +186,7 @@ How to get them:
 - `FIREFOX_API_KEY`
 - `FIREFOX_API_SECRET`
 
-These are passed to `yarn dlx web-ext sign` for signing and
+These are passed to `npx web-ext sign` for signing and
 publishing the extension.
 
 How to get them:
@@ -262,7 +293,7 @@ The build job uses:
 - `ubuntu-latest` for release, build, Chrome, Edge, and Firefox
 - `macos-latest` for Safari
 - Node.js `23.x`
-- Yarn in `Source/`
+- Yarn in `Source/` (pinned via `.yarnrc.yml` + the committed release binary)
 
 Before publishing, confirm that `Source/manifest.json` can safely have its
 version rewritten by the workflow and that `yarn build` produces a complete
@@ -275,9 +306,9 @@ The build job uploads `Source/dist/` as an artifact named
 
 The store-specific jobs then package that artifact like this:
 
-- Chrome downloads to `dist/` and zips `dist/` into
+- Chrome downloads to `dist/` and zips the contents into
   `extension-chrome.zip`
-- Edge downloads to `dist/` and zips `dist/` into `extension-edge.zip`
+- Edge downloads to `dist/` and zips the contents into `extension-edge.zip`
 - Firefox downloads to `Source/dist/` and signs the unpacked folder with
   `web-ext`
 - Safari downloads to `Source/dist/` and converts that folder into an Xcode

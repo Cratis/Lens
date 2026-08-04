@@ -18,6 +18,7 @@ import { SettingsView } from './settings/SettingsView';
 import { ContextView } from './context/ContextView';
 import { CommandsView } from './commands/CommandsView';
 import { QueriesView } from './queries/QueriesView';
+import { ObservableQueryDiagnosticsView } from './observable-query-diagnostics/ObservableQueryDiagnosticsView';
 import {
     fetchArcDevelopmentSources,
     fetchArcTenants,
@@ -89,7 +90,11 @@ export function LensPopup() {
             }
 
             return mergedSettings;
-        } catch {
+        } catch (error) {
+            // Never swallow this. It covers the persist as well as the fetch, so a storage rejection here is
+            // indistinguishable from an unreachable Arc host: both leave the popup showing a roster it did not
+            // keep, and the extension reads as signed out on the next open with nothing written anywhere.
+            console.error('[Lens][Settings] Full Arc refresh failed', error);
             return currentSettings;
         }
     };
@@ -293,6 +298,15 @@ export function LensPopup() {
             disabled: !hasArcContext,
         },
         {
+            id: 'observable-query-diagnostics',
+            label: 'Query Diagnostics',
+            iconClass: 'pi-chart-line',
+            tooltip: hasArcContext
+                ? 'Observable query diagnostics: live status of active observable queries.'
+                : 'Query diagnostics are available only when the active tab is an Arc application.',
+            disabled: !hasArcContext,
+        },
+        {
             id: 'settings',
             label: 'Settings',
             iconClass: 'pi-cog',
@@ -432,6 +446,10 @@ export function LensPopup() {
                                 });
                             }}
                         />
+                    )}
+
+                    {resolvedActiveTab === 'observable-query-diagnostics' && (
+                        <ObservableQueryDiagnosticsView hasArcContext={hasArcContext} />
                     )}
                 </main>
             </div>

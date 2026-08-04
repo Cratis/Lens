@@ -1,18 +1,21 @@
 {
     "name": "lens",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
     "private": true,
     "scripts": {
         "dev": "vite build --watch",
         "build": "vite build",
-        "build-package": "yarn build && cd .. && zip -r lens-extension.zip Source/dist/",
+        "build-package": "yarn build && cd dist && zip -r ../../lens-extension.zip .",
         "typecheck": "tsc --noEmit",
-        "ci": "tsc --noEmit && yarn build",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "ci": "yarn typecheck && yarn test && yarn build",
         "preview": "vite preview"
     },
     "dependencies": {
-        "@cratis/arc.react": "^20.26.18",
+        "@cratis/arc": "^20.28.0",
+        "@cratis/arc.react": "^20.28.0",
         "primeicons": "^7.0.0",
         "primereact": "^10.9.8",
         "react": "^18.3.1",
@@ -20,12 +23,18 @@
         "react-icons": "^5.6.0"
     },
     "devDependencies": {
+        "@types/chai": "^5.2.2",
         "@types/chrome": "^0.0.268",
         "@types/react": "^18.3.3",
         "@types/react-dom": "^18.3.0",
+        "@types/sinon": "^17.0.4",
         "@vitejs/plugin-react": "^6.0.1",
-        "typescript": "^5.5.4",
+        "chai": "^5.2.1",
+        "sinon": "^21.0.0",
+        "typescript": "^7.0.2",
         "vite": "^8.0.10",
-        "vite-plugin-web-extension": "^4.5.1"
-    }
+        "vite-plugin-web-extension": "^4.5.1",
+        "vitest": "^3.2.4"
+    },
+    "packageManager": "yarn@4.17.1"
 }

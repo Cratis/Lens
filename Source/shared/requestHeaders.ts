@@ -1,4 +1,8 @@
-import { ExtensionSettings, UserProfile } from './types';
+import { ExtensionSettings, Tenant, UserProfile } from './types';
+
+export const CLIENT_PRINCIPAL_ID_HEADER = 'X-MS-CLIENT-PRINCIPAL-ID';
+export const CLIENT_PRINCIPAL_NAME_HEADER = 'X-MS-CLIENT-PRINCIPAL-NAME';
+export const CLIENT_PRINCIPAL_HEADER = 'X-MS-CLIENT-PRINCIPAL';
 
 function buildClientPrincipal(user: UserProfile): string {
     const identityDetails = user.identityDetails && typeof user.identityDetails === 'object'
@@ -18,24 +22,35 @@ function buildClientPrincipal(user: UserProfile): string {
     return btoa(JSON.stringify(principal));
 }
 
+// Both callers build their headers here: the popup, which fetches Arc's own command/query surface, and the
+// service worker, which rewrites the app's requests. They used to carry separate copies of this, and a
+// divergence between them presents as "it works in Lens but not in my app" with nothing pointing at the cause.
+export function buildIdentityHeaders(user: UserProfile): Record<string, string> {
+    return {
+        [CLIENT_PRINCIPAL_ID_HEADER]: user.id,
+        [CLIENT_PRINCIPAL_NAME_HEADER]: user.name,
+        [CLIENT_PRINCIPAL_HEADER]: buildClientPrincipal(user),
+    };
+}
+
+export function buildTenantHeaders(tenant: Tenant, tenantHeaderName: string): Record<string, string> {
+    if (!tenantHeaderName) {
+        return {};
+    }
+
+    return { [tenantHeaderName]: tenant.id };
+}
+
 export function buildContextRequestHeaders(settings: ExtensionSettings | null): Record<string, string> {
     if (!settings) {
         return {};
     }
 
-    const headers: Record<string, string> = {};
     const user = settings.users.find(_ => _.id === settings.activeUserId);
     const tenant = settings.tenants.find(_ => _.id === settings.activeTenantId);
 
-    if (user) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = user.id;
-        headers['X-MS-CLIENT-PRINCIPAL-NAME'] = user.name;
-        headers['X-MS-CLIENT-PRINCIPAL'] = buildClientPrincipal(user);
-    }
-
-    if (tenant && settings.tenantHeaderName) {
-        headers[settings.tenantHeaderName] = tenant.id;
-    }
-
-    return headers;
+    return {
+        ...(user ? buildIdentityHeaders(user) : {}),
+        ...(tenant ? buildTenantHeaders(tenant, settings.tenantHeaderName) : {}),
+    };
 }

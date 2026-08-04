@@ -6,6 +6,7 @@
     "permissions": [
         "storage",
         "scripting",
+        "cookies",
         "declarativeNetRequest",
         "declarativeNetRequestWithHostAccess"
     ],

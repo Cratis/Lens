@@ -1,145 +1,117 @@
-import { getSettings } from '../shared/storage';
-import { ExtensionSettings, UserProfile } from '../shared/types';
+import { clearIdentityCookies } from '../shared/identity-cache';
+import { getSettings, SETTINGS_KEY } from '../shared/storage';
+import { ExtensionSettings } from '../shared/types';
+import { buildHeaderRules } from './headerRules';
 
-const RULE_USER_HEADERS = 1;
-const RULE_TENANT_HEADER = 2;
+async function updateHeaderRules(): Promise<void> {
+    const [settings, existingRules, existingSessionRules] = await Promise.all([
+        getSettings(),
+        chrome.declarativeNetRequest.getDynamicRules(),
+        chrome.declarativeNetRequest.getSessionRules(),
+    ]);
 
-function buildClientPrincipal(user: UserProfile): string {
-    const identityDetails = user.identityDetails && typeof user.identityDetails === 'object'
-        ? user.identityDetails
-        : {};
-
-    const principal = {
-        identityProvider: user.identityProvider || 'aad',
-        userId: user.id,
-        userDetails: user.name,
-        userRoles: user.roles.length > 0 ? user.roles : ['authenticated', 'anonymous'],
-        claims: user.claims.map(c => ({ typ: c.type, val: c.value })),
-        ...identityDetails,
-        ...user.applicationProperties,
-    };
-    return btoa(JSON.stringify(principal));
-}
-
-function buildUrlFilter(settings: ExtensionSettings): string {
-    if (settings.arcBaseUrl) {
-        try {
-            const url = new URL(settings.arcBaseUrl);
-            return `||${url.host}`;
-        } catch {
-            // fall through to wildcard
-        }
+    if (existingSessionRules.length > 0) {
+        await chrome.declarativeNetRequest.updateSessionRules({
+            removeRuleIds: existingSessionRules.map(rule => rule.id),
+        });
     }
-    return '*';
+
+    await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: existingRules.map(rule => rule.id),
+        addRules: buildHeaderRules(settings),
+    });
 }
 
-function getHost(url: string): string | null {
+function didGlobalSelectionChange(previous: ExtensionSettings | undefined, next: ExtensionSettings | undefined): boolean {
+    if (!previous || !next) {
+        return false;
+    }
+
+    return previous.activeUserId !== next.activeUserId ||
+        previous.activeTenantId !== next.activeTenantId;
+}
+
+function getOrigin(value: string | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
     try {
-        return new URL(url).hostname;
+        return new URL(value).origin;
     } catch {
         return null;
     }
 }
 
-function buildCondition(settings: ExtensionSettings): chrome.declarativeNetRequest.RuleCondition {
-    const initiatorHost = settings.arcPageOrigin ? getHost(settings.arcPageOrigin) : null;
-    if (initiatorHost) {
-        return {
-            urlFilter: '*',
-            initiatorDomains: [initiatorHost],
-            resourceTypes: [
-                chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
-            ],
-        };
-    }
-
-    const urlFilter = buildUrlFilter(settings);
-    return {
-        urlFilter,
-        resourceTypes: [
-            chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST,
-        ],
-    };
-}
-
-async function updateHeaderRules(settings: ExtensionSettings): Promise<void> {
-    const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-    const removeRuleIds = existingRules.map(r => r.id);
-
-    const addRules: chrome.declarativeNetRequest.Rule[] = [];
-    const condition = buildCondition(settings);
-
-    const user = settings.users.find(u => u.id === settings.activeUserId);
-    const tenant = settings.tenants.find(t => t.id === settings.activeTenantId);
-
-    if (user) {
-        addRules.push({
-            id: RULE_USER_HEADERS,
-            priority: 1,
-            action: {
-                type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-                requestHeaders: [
-                    {
-                        header: 'X-MS-CLIENT-PRINCIPAL-ID',
-                        operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-                        value: user.id,
-                    },
-                    {
-                        header: 'X-MS-CLIENT-PRINCIPAL-NAME',
-                        operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-                        value: user.name,
-                    },
-                    {
-                        header: 'X-MS-CLIENT-PRINCIPAL',
-                        operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-                        value: buildClientPrincipal(user),
-                    },
-                ],
-            },
-            condition: {
-                ...condition,
-            },
+async function reloadTab(tabId: number): Promise<void> {
+    try {
+        await chrome.tabs.reload(tabId);
+    } catch (error) {
+        console.warn('[Lens][Context] Could not reload tab after context change', {
+            tabId,
+            error: String(error),
         });
     }
-
-    if (tenant && settings.tenantHeaderName) {
-        addRules.push({
-            id: RULE_TENANT_HEADER,
-            priority: 1,
-            action: {
-                type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-                requestHeaders: [
-                    {
-                        header: settings.tenantHeaderName,
-                        operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-                        value: tenant.id,
-                    },
-                ],
-            },
-            condition: {
-                ...condition,
-            },
-        });
-    }
-
-    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
 }
 
-chrome.storage.onChanged.addListener(async (changes) => {
-    if ('settings' in changes) {
-        const newSettings = changes['settings'].newValue as ExtensionSettings;
-        await updateHeaderRules(newSettings);
+// Headers alone do not change who you are once Arc has issued a session cookie: the app keeps presenting the
+// identity it was first given. Dropping the cookie and reloading the matching tabs is what actually makes the
+// newly selected user or tenant take effect.
+async function invalidateGlobalContext(previous: ExtensionSettings | undefined, next: ExtensionSettings | undefined): Promise<void> {
+    if (!didGlobalSelectionChange(previous, next) || !next) {
+        return;
     }
+
+    const expectedOrigins = [
+        getOrigin(next.arcPageOrigin),
+        getOrigin(next.arcBaseUrl),
+    ].filter((_): _ is string => _ !== null);
+
+    await clearIdentityCookies({
+        arcBaseUrl: next.arcBaseUrl,
+        arcPageOrigin: next.arcPageOrigin,
+    });
+
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.map(async tab => {
+        if (!tab.id || !tab.url) {
+            return;
+        }
+
+        const tabOrigin = getOrigin(tab.url);
+        if (!tabOrigin || !expectedOrigins.includes(tabOrigin)) {
+            return;
+        }
+
+        await reloadTab(tab.id);
+    }));
+}
+
+async function handleStorageChanged(
+    changes: Record<string, chrome.storage.StorageChange>,
+    areaName: string): Promise<void> {
+    if (areaName !== 'local' || !(SETTINGS_KEY in changes)) {
+        return;
+    }
+
+    // Rules first, then the cookie, then the reload -- the reloaded page must already be inside the new
+    // context, otherwise it re-authenticates as the identity that was just cleared.
+    await updateHeaderRules();
+    await invalidateGlobalContext(
+        changes[SETTINGS_KEY].oldValue as ExtensionSettings | undefined,
+        changes[SETTINGS_KEY].newValue as ExtensionSettings | undefined);
+}
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+    void handleStorageChanged(changes, areaName);
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
-    const settings = await getSettings();
-    await updateHeaderRules(settings);
+    await updateHeaderRules();
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-    const settings = await getSettings();
-    await updateHeaderRules(settings);
+    await updateHeaderRules();
 });
 
 export {};
