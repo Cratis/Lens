@@ -10,7 +10,7 @@ export interface ExtensionNavigationState {
     queriesSelectedKey: string;
 }
 
-const SETTINGS_KEY = 'settings';
+export const SETTINGS_KEY = 'settings';
 const NAVIGATION_STATE_KEY = 'navigationState';
 
 export const DEFAULT_NAVIGATION_STATE: ExtensionNavigationState = {

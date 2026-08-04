@@ -16,5 +16,6 @@
         "noUnusedParameters": true,
         "noFallthroughCasesInSwitch": true
     },
-    "include": ["background", "shared", "arc", "commands", "context", "queries", "settings", "*.ts", "*.tsx"]
+    "include": ["**/*.ts", "**/*.tsx"],
+    "exclude": ["node_modules", "dist"]
 }
