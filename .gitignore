@@ -301,6 +301,11 @@ storybook-static
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/sdks
+!**/.yarn/versions
 
 .DS_Store
 
