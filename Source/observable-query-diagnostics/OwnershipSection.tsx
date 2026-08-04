@@ -1,4 +1,4 @@
-import { OwnershipDiagnostics } from '../shared/arc-context';
+import { OwnershipDiagnostics } from './diagnosticsCapture';
 import { DiagnosticsSection } from './DiagnosticsSection';
 
 export function OwnershipSection({ ownership }: { ownership: OwnershipDiagnostics }) {

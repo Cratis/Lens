@@ -1,4 +1,4 @@
-import { HealthDiagnostics } from '../shared/arc-context';
+import { HealthDiagnostics } from './diagnosticsCapture';
 import { DiagnosticsBadge, DiagnosticsRow, DiagnosticsSection } from './DiagnosticsSection';
 
 export function HealthSection({ health }: { health: HealthDiagnostics }) {

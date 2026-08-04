@@ -1,4 +1,4 @@
-import { CacheDiagnostics } from '../shared/arc-context';
+import { CacheDiagnostics } from './diagnosticsCapture';
 import { DiagnosticsBadge, DiagnosticsRow, DiagnosticsSection, DiagnosticsValue } from './DiagnosticsSection';
 import { formatBytes } from './formatBytes';
 

@@ -50,14 +50,6 @@ async function removeIdentityCookiesForUrl(url: string): Promise<void> {
         name: ARC_IDENTITY_COOKIE_NAME,
     });
 
-    if (cookies.length === 0) {
-        await chrome.cookies.remove({
-            url,
-            name: ARC_IDENTITY_COOKIE_NAME,
-        });
-        return;
-    }
-
     await Promise.all(cookies.map(cookie => chrome.cookies.remove({
         url: getUrlForCookie(cookie, url),
         name: cookie.name,

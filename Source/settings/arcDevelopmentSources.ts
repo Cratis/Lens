@@ -5,15 +5,26 @@ const USERS_ENDPOINT = '/.cratis/users';
 const TENANTS_ENDPOINT = '/.cratis/tenants';
 const IDENTITY_DETAILS_SCHEMA_ENDPOINT = '/.cratis/identity-details/schema';
 
+// A fetch that rejected and a host that genuinely has no users both produce an empty list, and the merge
+// has to tell them apart: the first must keep what it already had, the second must clear it. Carrying the
+// outcome next to the data is what makes that decision possible -- and keeps a caller from forgetting it.
 export interface ArcDevelopmentSources {
     users: UserProfile[];
     tenants: Tenant[];
     identityDetailsSchema?: JsonSchema;
+    usersFailed: boolean;
+    tenantsFailed: boolean;
 }
 
 export interface ArcUserSources {
     users: UserProfile[];
     identityDetailsSchema?: JsonSchema;
+    usersFailed: boolean;
+}
+
+export interface ArcTenantSources {
+    tenants: Tenant[];
+    tenantsFailed: boolean;
 }
 
 export interface ArcSourceRequestOptions {
@@ -286,6 +297,8 @@ export async function fetchArcDevelopmentSources(baseUrl: string, options: ArcSo
         users,
         tenants,
         identityDetailsSchema,
+        usersFailed: usersResult.status === 'rejected',
+        tenantsFailed: tenantsResult.status === 'rejected',
     };
 }
 
@@ -308,15 +321,16 @@ export async function fetchArcUsers(baseUrl: string, options: ArcSourceRequestOp
     return {
         users,
         identityDetailsSchema,
+        usersFailed: usersResult.status === 'rejected',
     };
 }
 
-export async function fetchArcTenants(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<Tenant[]> {
+export async function fetchArcTenants(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<ArcTenantSources> {
     try {
-        return await fetchTenants(baseUrl, options);
+        return { tenants: await fetchTenants(baseUrl, options), tenantsFailed: false };
     } catch (error) {
         console.warn('[Lens][ArcSources] Tenants-only fetch failed', { baseUrl, reason: toReasonDetails(error) });
-        return [];
+        return { tenants: [], tenantsFailed: true };
     }
 }
 
@@ -324,11 +338,10 @@ export function mergeArcSourcedSettings(settings: ExtensionSettings, sources: Ar
     const customUsers = settings.users.filter(_ => _.source !== 'arc');
     const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
 
-    // A refresh whose fetch rejected returns an empty list (Promise.allSettled -> []). Keep the
-    // previously fetched arc entries in that case so a transient/failed refresh never wipes the
-    // active user/tenant selection.
-    const arcUsers = sources.users.length > 0 ? sources.users : settings.users.filter(_ => _.source === 'arc');
-    const arcTenants = sources.tenants.length > 0 ? sources.tenants : settings.tenants.filter(_ => _.source === 'arc');
+    // Only a failed fetch keeps the previous entries. A refresh that succeeded and returned nothing is a
+    // host that really has no users or tenants, and must be allowed to clear them.
+    const arcUsers = sources.usersFailed ? settings.users.filter(_ => _.source === 'arc') : sources.users;
+    const arcTenants = sources.tenantsFailed ? settings.tenants.filter(_ => _.source === 'arc') : sources.tenants;
 
     const users = [...customUsers, ...arcUsers];
     const tenants = [...customTenants, ...arcTenants];
@@ -349,10 +362,10 @@ export function mergeArcSourcedSettings(settings: ExtensionSettings, sources: Ar
     };
 }
 
-export function mergeArcUsers(settings: ExtensionSettings, users: UserProfile[]): ExtensionSettings {
+export function mergeArcUsers(settings: ExtensionSettings, sources: ArcUserSources): ExtensionSettings {
     const customUsers = settings.users.filter(_ => _.source !== 'arc');
-    // Preserve the prior arc users when a refresh returned none, so it never wipes the selection.
-    const arcUsers = users.length > 0 ? users : settings.users.filter(_ => _.source === 'arc');
+    // Only a failed fetch keeps the previous users; a successful empty one is a host with no users.
+    const arcUsers = sources.usersFailed ? settings.users.filter(_ => _.source === 'arc') : sources.users;
     const mergedUsers = [...customUsers, ...arcUsers];
 
     const activeUserId = mergedUsers.some(_ => _.id === settings.activeUserId)
@@ -366,10 +379,10 @@ export function mergeArcUsers(settings: ExtensionSettings, users: UserProfile[])
     };
 }
 
-export function mergeArcTenants(settings: ExtensionSettings, tenants: Tenant[]): ExtensionSettings {
+export function mergeArcTenants(settings: ExtensionSettings, sources: ArcTenantSources): ExtensionSettings {
     const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
-    // Preserve the prior arc tenants when a refresh returned none, so it never wipes the selection.
-    const arcTenants = tenants.length > 0 ? tenants : settings.tenants.filter(_ => _.source === 'arc');
+    // Only a failed fetch keeps the previous tenants; a successful empty one is a host with no tenants.
+    const arcTenants = sources.tenantsFailed ? settings.tenants.filter(_ => _.source === 'arc') : sources.tenants;
     const mergedTenants = [...customTenants, ...arcTenants];
 
     const activeTenantId = mergedTenants.some(_ => _.id === settings.activeTenantId)
