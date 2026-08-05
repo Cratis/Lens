@@ -127,6 +127,19 @@ p {
     font-weight: 500;
 }
 
+/* The counterpart to the saved badge: a write that was rejected has to be as visible as one that landed,
+   or the popup goes on showing a roster it never kept. The full reason is on the title attribute. */
+.persist-error-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    color: var(--red-400);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: help;
+}
+
 .arc-status-trigger.p-button {
     margin-left: auto;
     color: var(--yellow-400);
