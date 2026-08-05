@@ -10,9 +10,9 @@ import {
     getNavigationState,
     getSettings,
     saveNavigationState,
-    saveSettings,
     PopupTab,
 } from './shared/storage';
+import { persistSettings } from './shared/settingsPersistence';
 import { ArcContextSnapshot, captureArcContextForActiveTab, getArcContextSnapshot, saveArcContextSnapshot } from './shared/arc-context';
 import { SettingsView } from './settings/SettingsView';
 import { ContextView } from './context/ContextView';
@@ -51,6 +51,7 @@ export function LensPopup() {
     const [navigationHydrated, setNavigationHydrated] = useState(false);
     const [arcStatusHovered, setArcStatusHovered] = useState(false);
     const [saved, setSaved] = useState(false);
+    const [persistError, setPersistError] = useState<string | null>(null);
     const [identityDetailsSchema, setIdentityDetailsSchema] = useState<JsonSchema | undefined>(undefined);
     const [settingsUsersRefreshing, setSettingsUsersRefreshing] = useState(false);
     const [settingsTenantsRefreshing, setSettingsTenantsRefreshing] = useState(false);
@@ -86,14 +87,14 @@ export function LensPopup() {
             });
             if (JSON.stringify(currentSettings) !== JSON.stringify(mergedSettings)) {
                 setSettings(mergedSettings);
-                await saveSettings(mergedSettings);
+                setPersistError(await persistSettings(mergedSettings));
             }
 
             return mergedSettings;
         } catch (error) {
-            // Never swallow this. It covers the persist as well as the fetch, so a storage rejection here is
-            // indistinguishable from an unreachable Arc host: both leave the popup showing a roster it did not
-            // keep, and the extension reads as signed out on the next open with nothing written anywhere.
+            // Never swallow this. A fetch that fails here leaves the popup showing whatever roster it already
+            // had, so without the log there is nothing anywhere connecting an unreachable Arc host to the
+            // stale view. The persist no longer lands in this catch -- it reports through setPersistError.
             console.error('[Lens][Settings] Full Arc refresh failed', error);
             return currentSettings;
         }
@@ -114,7 +115,7 @@ export function LensPopup() {
         };
 
         setSettings(updated);
-        await saveSettings(updated);
+        setPersistError(await persistSettings(updated));
         return updated;
     };
 
@@ -129,6 +130,8 @@ export function LensPopup() {
                 const withRouting = await syncArcRoutingSettings(freshSnapshot, settings);
                 await mergeAndPersistArcSources(freshSnapshot, withRouting);
             }
+        } catch (error) {
+            console.error('[Lens][Settings] Arc context refresh failed', error);
         } finally {
             setArcContextLoading(false);
         }
@@ -174,7 +177,11 @@ export function LensPopup() {
                 usersAfter: mergedSettings.users.length,
             });
             setSettings(mergedSettings);
-            await saveSettings(mergedSettings);
+            setPersistError(await persistSettings(mergedSettings));
+        } catch (error) {
+            // Without this the rejection escapes unhandled: the refresh runs from a click handler as
+            // `void refreshUsers()`, so nothing is awaiting it and nothing would report the failure.
+            console.error('[Lens][Settings] Users refresh failed', error);
         } finally {
             setSettingsUsersRefreshing(false);
         }
@@ -212,7 +219,9 @@ export function LensPopup() {
                 tenantsAfter: mergedSettings.tenants.length,
             });
             setSettings(mergedSettings);
-            await saveSettings(mergedSettings);
+            setPersistError(await persistSettings(mergedSettings));
+        } catch (error) {
+            console.error('[Lens][Settings] Tenants refresh failed', error);
         } finally {
             setSettingsTenantsRefreshing(false);
         }
@@ -267,7 +276,14 @@ export function LensPopup() {
 
     const handleChange = async (updated: ExtensionSettings) => {
         setSettings(updated);
-        await saveSettings(updated);
+
+        const failure = await persistSettings(updated);
+        setPersistError(failure);
+        if (failure) {
+            // Confirming a save that did not happen is the whole trap this guards against.
+            return;
+        }
+
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
     };
@@ -379,6 +395,12 @@ export function LensPopup() {
                     />
                 )}
                 {saved && <span className="saved-badge">Saved ✓</span>}
+                {persistError && (
+                    <span className="persist-error-badge" role="alert" title={persistError}>
+                        <span className="pi pi-exclamation-triangle" aria-hidden="true" />
+                        Not saved
+                    </span>
+                )}
             </header>
 
             <div className="lens-layout">

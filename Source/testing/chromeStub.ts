@@ -7,6 +7,10 @@ import { ExtensionSettings, Tenant, UserProfile } from '../shared/types';
 export interface ChromeStub {
     localStore: Record<string, unknown>;
     syncStore: Record<string, unknown>;
+
+    /** Set to make every subsequent write to storage.local reject, the way an over-quota write does. */
+    localWriteFailure: Error | null;
+
     removedCookies: { url: string; name: string }[];
     cookiesByUrl: Record<string, chrome.cookies.Cookie[]>;
 }
@@ -15,6 +19,7 @@ export function installChromeStub(): ChromeStub {
     const stub: ChromeStub = {
         localStore: {},
         syncStore: {},
+        localWriteFailure: null,
         removedCookies: [],
         cookiesByUrl: {},
     };
@@ -22,14 +27,20 @@ export function installChromeStub(): ChromeStub {
     const readArea = (store: Record<string, unknown>) => (key: string) =>
         Promise.resolve(store[key] === undefined ? {} : { [key]: store[key] });
 
-    const writeArea = (store: Record<string, unknown>) => (items: Record<string, unknown>) => {
-        Object.assign(store, items);
-        return Promise.resolve();
-    };
+    const writeArea = (store: Record<string, unknown>, getFailure: () => Error | null = () => null) =>
+        (items: Record<string, unknown>) => {
+            const failure = getFailure();
+            if (failure) {
+                return Promise.reject(failure);
+            }
+
+            Object.assign(store, items);
+            return Promise.resolve();
+        };
 
     (globalThis as Record<string, unknown>).chrome = {
         storage: {
-            local: { get: readArea(stub.localStore), set: writeArea(stub.localStore) },
+            local: { get: readArea(stub.localStore), set: writeArea(stub.localStore, () => stub.localWriteFailure) },
             sync: { get: readArea(stub.syncStore), set: writeArea(stub.syncStore) },
         },
         cookies: {
