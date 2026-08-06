@@ -6,7 +6,7 @@
     "scripts": {
         "dev": "vite build --watch",
         "build": "vite build",
-        "build-package": "yarn build && cd dist && zip -r ../../lens-extension.zip .",
+        "build-package": "node ./scripts/build-package.js",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",
