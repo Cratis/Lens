@@ -3,10 +3,12 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const versionOverride = process.argv[2] || null;
-const root = path.resolve(__dirname, '..');
-const distDir = path.join(root, 'dist');
+const sourceRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(__dirname, '..', '..');
+const distDir = path.join(sourceRoot, 'dist');
+const outputDist = path.join(repoRoot, 'dist');
 const zipName = versionOverride ? `lens-extension-${versionOverride}.zip` : 'lens-extension.zip';
-const zipPath = path.join(root, '..', zipName);
+const zipPath = path.join(outputDist, zipName);
 
 function run(command, args, options) {
   const result = spawnSync(command, args, { stdio: 'inherit', ...options });
@@ -20,7 +22,11 @@ function run(command, args, options) {
 }
 
 console.log('Building extension...');
-run('yarn', ['build'], { cwd: root });
+run('yarn', ['build'], { cwd: sourceRoot });
+
+if (!fs.existsSync(outputDist)) {
+  fs.mkdirSync(outputDist, { recursive: true });
+}
 
 if (versionOverride) {
   const manifestPath = path.join(distDir, 'manifest.json');
@@ -35,7 +41,7 @@ if (versionOverride) {
   console.log(`Applied version override to dist/manifest.json: ${versionOverride}`);
 }
 
-console.log(`Creating package ${zipName}...`);
+console.log(`Creating package ${zipName} in ${outputDist}...`);
 fs.rmSync(zipPath, { force: true });
 run('zip', ['-r', zipPath, '.'], { cwd: distDir });
 
