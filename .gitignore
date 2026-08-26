@@ -325,3 +325,6 @@ Source/dist/
 Source/.web-extension-artifacts/
 Source/safari-extension/
 lens-extension.zip
+
+# Local AI work artifacts (plans, handovers, session notes) — never tracked
+.ai-work/
