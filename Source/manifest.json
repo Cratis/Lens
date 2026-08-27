@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Cratis Lens",
     "version": "1.0.0",
-    "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
+    "description": "Developer tool for Cratis Arc (CQRS for ASP.NET Core): switch tenant and user identity, and run commands and queries in your app.",
     "permissions": [
         "storage",
         "scripting",

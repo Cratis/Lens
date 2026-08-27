@@ -1,7 +1,7 @@
 {
     "name": "lens",
     "version": "1.0.0",
-    "description": "Browser extension bringing Cratis insights and developer productivity tools to your fingertips.",
+    "description": "Developer tool for Cratis Arc (CQRS for ASP.NET Core): switch tenant and user identity, and execute commands and queries against your running app.",
     "private": true,
     "scripts": {
         "dev": "vite build --watch",
