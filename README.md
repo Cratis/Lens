@@ -2,6 +2,8 @@
 
 # 🔍 Lens
 
+Cratis Lens is a browser extension for developers to explore Cratis Arc commands and queries as any user or tenant.
+
 **The developer's viewfinder for the Cratis Stack — become any user, step into any tenant, and fire commands and queries at your running app, straight from the browser.**
 
 [![Discord](https://img.shields.io/discord/1182595891576717413?label=Discord&logo=discord&logoColor=white)](https://discord.gg/kt4AMpV8WV)
@@ -184,6 +186,6 @@ Everything Cratis publishes today is MIT licensed and free to use.
 
 <div align="center">
 
-*Part of the [Cratis](https://cratis.io) platform · Licensed under the [MIT license](LICENSE)*
+*Part of the [Cratis](https://www.cratis.io) platform · Licensed under the [MIT license](LICENSE)*
 
 </div>
