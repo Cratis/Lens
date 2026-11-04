@@ -1,25 +1,19 @@
 # Publishing Setup
 
-Use this guide to configure Lens so the Publish workflow can build and
-release the browser extensions.
+Use this guide as a Lens release maintainer: establish store ownership and signing assets, collect the named credentials, save the repository secrets, then check the build artifact before deliberately starting a release. If you only want to use Lens locally, follow Getting Started under Related files; browser-store credentials are not part of that setup.
 
 ## What the workflow does
 
 The publish workflow in
-[.github/workflows/publish.yml](../../.github/workflows/publish.yml)
-does this:
+[.github/workflows/publish.yml](../../../.github/workflows/publish.yml)
+separates the release decision, shared build and store-specific jobs:
 
 1. Runs the release step through `cratis/release-action@v1`.
-2. Builds the extension in `Source/` with Yarn on Node.js 23.
+2. Builds the extension in `Source/` with Yarn on Node.js 23 when the release decision requests publishing.
 3. Uploads `Source/dist/` as the shared build artifact.
-4. Publishes Chrome, Edge, Firefox, and Safari releases when the release
-   is not marked as a prerelease.
+4. Starts the Chrome, Edge, Firefox, and Safari publish jobs only for a publish decision that is not a prerelease. Check each job's result separately; starting a job is not a published store listing.
 
-Publishing can start in two ways:
-
-- Manually through `workflow_dispatch`
-- Automatically when a pull request is closed and changes under `Source/`
-  are included
+The workflow starts manually through `workflow_dispatch`, or automatically on a push to `main` that changes files under `Source/`. It does not run once for every closed pull request. Runs are grouped by workflow and ref and configured to queue rather than replace an in-flight run.
 
 ## Prerequisites
 
@@ -38,13 +32,11 @@ yarn ci        # typecheck, specs and build — the same gate CI runs
 
 ## 1. Configure repository secrets
 
-Open **GitHub repository settings > Secrets and variables > Actions**
-and add the secrets used by the workflow.
+Collect the store inputs in the next section before entering them here. Use the ownership checklist to confirm who controls each account and its rotation; a copied identifier alone does not establish publishing access. Then open **GitHub repository settings > Secrets and variables > Actions** and add the named secrets for the workflow. Keep credential values out of the workflow file and release logs.
 
 ## 2. How to get the secrets
 
-Use the sections below to collect the values before you add them as
-GitHub Actions secrets.
+Use the store sections as acquisition references, then return to repository secret entry. Confirm each provider's current account, OAuth, signing and pricing requirements in its portal before creating assets: repository source establishes which inputs the jobs consume, not the provider's current enrollment or approval policy.
 
 ### Chrome Web Store
 
@@ -106,7 +98,7 @@ How to get them:
      inspecting Arc commands and queries and simulating tenant/user context.
    - Justify `storage` as local device storage for Lens settings,
      configured Arc sources, users, tenants, and popup navigation state.
-     Lens uses `chrome.storage.local` only — it does not use Chrome sync.
+     Lens saves current settings in `chrome.storage.local`; loading settings can also read older Chrome sync data as a legacy-settings fallback.
    - Justify `scripting` as injecting a read-only detection script into the
      inspected page to determine whether it is a Cratis Arc application and
      to read its Arc configuration and observable-query diagnostics. The
@@ -121,11 +113,7 @@ How to get them:
    - Justify `declarativeNetRequest` and
      `declarativeNetRequestWithHostAccess` as required to add Cratis Arc
      identity and tenant headers to matching XHR requests.
-   - Justify `<all_urls>` as needed because developers can configure Lens
-     against arbitrary local or remote Cratis Arc application origins.
-     Lens never installs a wildcard rule: header rules are scoped to the
-     detected Arc page origin, or to the configured Arc backend host, and
-     when neither is configured Lens installs no rules at all.
+   - Describe `<all_urls>` alongside the actual rule conditions: Lens supports development applications on local or remote hosts. When a page hostname is available, the rules use a wildcard URL filter bounded by that initiating hostname; otherwise they use the configured backend host. With no usable host scope, Lens installs no rules. This is host-based matching, not a claim of full-origin isolation.
    - Make sure the dashboard privacy answers match
      [PRIVACY_POLICY.md](../../../PRIVACY_POLICY.md).
 
@@ -214,7 +202,7 @@ How to get them:
 - `APPLE_API_KEY_ID`
 - `APPLE_API_ISSUER_ID`
 
-These are used during the Safari conversion, archive, and export steps on `macos-latest`.
+The Safari job runs conversion, archive and export on `macos-latest`. It references these inputs, but the workflow shows no certificate-import or private-key provisioning step. Establish that runner handoff before treating Safari as ready; registering secret identifiers is not the same as installing signing material.
 
 How to get them:
 
@@ -257,11 +245,8 @@ How to get them:
    - Store the `.p8` file securely — it can only be downloaded once
 
 5. **Private key setup:**
-   - The workflow needs access to the `.p8` private key file
-   - The file must be available to the macOS runner in the location
-     expected by `xcodebuild`
-   - Consider adding the `.p8` file contents as a base64-encoded secret
-     and decoding it in the workflow
+   - Confirm how the `.p8` private key file will reach the macOS runner through your approved signing setup.
+   - The workflow invokes `xcodebuild` but does not show how to install the `.p8` file. Do not assume that adding an unused repository secret completes this handoff; the release maintainer must resolve the runner provisioning procedure separately.
 
 ## 3. Secret acquisition checklist
 
@@ -279,6 +264,7 @@ Before the first publish, confirm you can answer all of these:
 
 The workflow requests these GitHub permissions:
 
+- `issues: write`
 - `contents: write`
 - `deployments: write`
 - `id-token: write`
@@ -295,9 +281,7 @@ The build job uses:
 - Node.js `23.x`
 - Yarn in `Source/` (pinned via `.yarnrc.yml` + the committed release binary)
 
-Before publishing, confirm that `Source/manifest.json` can safely have its
-version rewritten by the workflow and that `yarn build` produces a complete
-`Source/dist/` folder.
+The build job rewrites `Source/manifest.json` from the release step's version output before `yarn build`. Check the resulting `Source/dist/` manifest and bundle rather than assuming the checked-in version is the one being packaged. A completed build is not a check of each store's version rules.
 
 ## 6. Understand artifact packaging
 
@@ -314,10 +298,13 @@ The store-specific jobs then package that artifact like this:
 - Safari downloads to `Source/dist/` and converts that folder into an Xcode
   Safari extension project
 
-This means publishing setup depends on the extension being fully buildable
-from `Source/dist/` alone.
+The store jobs prepare the shared built artifact; they do not repeat the extension build. Inspect the downloaded folder and the archive's manifest location when diagnosing a packaging failure. Safari also reads the repository's export options file and needs its signing assets, so `Source/dist/` alone is not a complete Safari release setup.
+
+For a local archive, run `yarn build-package` from the Source directory. The repository helper builds the extension and writes `dist/lens-extension.zip` at the repository root. That helper path differs from both the initial Chrome listing ZIP described above and the Chrome/Edge ZIP names produced by the workflow.
 
 ## 7. Run a release
+
+Manual dispatch is a release action, not a read-only packaging check. A non-prerelease publish decision starts all four store jobs after the build; a prerelease skips those jobs but can still run the release and build steps. Complete the readiness checks below before starting a run:
 
 To publish manually:
 
@@ -327,38 +314,25 @@ To publish manually:
 4. Provide `release-notes`.
 5. Start the workflow.
 
-If the release action decides the version should publish and it is not a
-prerelease, the browser store jobs will run automatically after the build
-job finishes.
+After starting a run, inspect the release job's publish decision, prerelease flag and reason, then the build artifact and each store job's result. The build requires a publish decision; the store jobs also require a non-prerelease. Use the job outcomes to distinguish a deliberately skipped store publish from a failed upload or missing signing setup.
 
 ## 8. Recommended setup checklist
 
-- Add all required store secrets before the first release
-- Validate `yarn build` locally from `Source/`
-- Confirm store credentials have publish rights, not just read access
-- Verify Safari signing assets are available to the macOS runner
-- Test with a prerelease first if you want to verify the release step
-  without publishing to stores
+- Complete the account-ownership checklist and secret entry before a store release; confirm publish rights, not just read access.
+- Validate `yarn build` locally from `Source/` and inspect the artifact/version used by the workflow.
+- Resolve Safari runner signing/key provisioning before a non-prerelease run; the workflow does not supply that installation procedure.
+- If you choose a prerelease first, use it to inspect the release/build path and shared artifact. Store jobs are skipped, so this does not test their credentials, signing or upload steps.
+- Start a non-prerelease only when you intend the store jobs to run, then inspect each result rather than treating build success as publication.
 
 ## 9. Troubleshooting
 
-**The publish run was cancelled seconds after a merge.** Closing several pull
-requests at once — which is what merging a consolidation does, since GitHub
-closes every pull request whose commits it carries — starts one Publish run per
-closed pull request. The workflow's `concurrency` group is keyed by the pull
-request number so those runs cannot cancel each other; if you change that key,
-make sure it stays unique per pull request, or the last run to start will cancel
-the one that was meant to cut the release.
+**The publish run was cancelled seconds after a merge.** Compare the run's event and ref in GitHub Actions with the workflow configuration before changing `concurrency`. The current trigger is a Source-changing push to main, not one run per closed pull request. Its workflow/ref group is configured to queue runs; the retired pull-request-number explanation does not diagnose this configuration. Inspect the affected run and its job logs rather than changing the grouping to match the old advice.
 
-**The release job ran but every store job was skipped.** That is the release
-action reporting `should-publish: false`. The most common cause is a merged pull
-request with no semantic version label — apply `major`, `minor`, or `patch`.
+**The release job ran but every store job was skipped.** Inspect both the publish decision and prerelease flag. `should-publish: false` skips the build and store path; a prerelease can build while still skipping every store job. The verify-published job reports the no-label and error reasons as failures. For a missing semantic version label, follow its diagnostic and add exactly one of `major`, `minor`, or `patch` to the merged pull request before retrying.
 
-**A store job failed with a credentials error.** Check that every secret in
-section 1 exists. A missing secret is not reported until the store job itself
-runs, so the release and build jobs succeed first and the failure looks late.
+**A store job failed with a credentials error.** Start with the failing step's named inputs and the corresponding store list in section 2. Check account ownership and publish access as well as whether the named secrets are present, without printing their values. A local build or successful prerelease does not validate a skipped store job's credentials; Safari also needs the runner signing/key handoff described above.
 
 ## Related files
 
-- [.github/workflows/publish.yml](../../.github/workflows/publish.yml)
+- [.github/workflows/publish.yml](../../../.github/workflows/publish.yml)
 - [Getting Started](../index.md)
