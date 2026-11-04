@@ -2,9 +2,9 @@
 
 # 🔍 Lens
 
-Cratis Lens is a browser extension for developers to explore Cratis Arc commands and queries as any user or tenant.
+Cratis Lens is a browser extension for inspecting commands, queries, users, and tenants while developing a Cratis Arc application.
 
-**The developer's viewfinder for the Cratis Stack — become any user, step into any tenant, and fire commands and queries at your running app, straight from the browser.**
+**Choose a development context, inspect a command or query, and read its response in the browser.**
 
 [![Discord](https://img.shields.io/discord/1182595891576717413?label=Discord&logo=discord&logoColor=white)](https://discord.gg/kt4AMpV8WV)
 [![Build](https://github.com/Cratis/Lens/actions/workflows/pull-requests.yml/badge.svg)](https://github.com/Cratis/Lens/actions/workflows/pull-requests.yml)
@@ -15,26 +15,18 @@ Cratis Lens is a browser extension for developers to explore Cratis Arc commands
 
 ---
 
-On a film set, the **lens** is what the camera sees the scene through — swap it and the whole shot changes: a
-new angle, a tighter focus, a different depth of field. That's the idea. Lens is the lens you point at your
-running Cratis Arc application while you build it: watch it as a **different user**, from inside a **different
-tenant**, and focus right in on a single command or query to see exactly what the backend does — no rebuild,
-no hand-crafted headers, no leaving the page you're already on.
+When you need to inspect a query under a different development context, Lens lets you choose the user and tenant in its popup instead of assembling request headers in a REST client. Start with Quick start below to build and load the extension, then open it from the application tab you want to inspect.
 
-The friction it removes is real: no more pasting identity headers into a REST client, no more restarting the
-app to switch tenants, no more writing throwaway test harnesses just to see what a query returns.
+Check the host before switching users. The .NET Arc forwarded-header handler ignores Lens identity headers unless the host opts in through `Cratis:Arc:TrustForwardedIdentityHeaders`, which is off by default. Use an isolated development host for this: the headers are unsigned, and choosing a user in Lens is not a sign-in mechanism.
 
-[Arc](https://github.com/Cratis/Arc) is the CQRS layer for ASP.NET Core over
-[Chronicle](https://github.com/Cratis/Chronicle), the MIT-licensed event-sourcing database — and Lens is the
-development-time companion for any app built on it.
+[Arc](https://github.com/Cratis/Arc) is the CQRS framework for ASP.NET Core. It works without
+[Chronicle](https://github.com/Cratis/Chronicle), the MIT-licensed event-sourcing database. Lens inspects an Arc application; it is not an event-store browser.
 
 ## 🔍 Why "Lens"?
 
 Three reasons, and they all line up:
 
-- **The camera lens sets the point of view.** A cinematographer chooses the lens to decide what the audience
-  sees and how it's framed. Lens does the same for your app in development: choose the user, choose the tenant,
-  and every request is framed from that point of view.
+- **The camera lens sets the point of view.** Choose a user and tenant to inspect how your development application responds to that context. The request coverage and host requirements below determine where that selection takes effect.
 - **A lens is also what you inspect through.** Beyond the camera, a lens magnifies and focuses — it's an
   instrument for *seeing clearly*. Lens brings your commands and queries under the glass so you can test them
   and read back exactly what they return.
@@ -45,60 +37,50 @@ Three reasons, and they all line up:
 
 ## 🎥 What a session looks like
 
-Lens lives in your browser toolbar. Open the popup and you're directing the shot:
+After loading Lens, open its toolbar popup from your application's tab. Lens looks for the page's Arc context and uses the detected base URL to load `/.cratis/commands` and `/.cratis/queries`. A detected page enables the explorers; it does not prove that the backend endpoints are reachable or accept the selected identity.
 
-- **🏢 Pick a tenant** — the tenancy header is injected into every request; test multi-tenant behavior without
-  touching config or restarting.
-- **👤 Pick a user** — identity, claims, and permissions ride along, so the backend authorizes the request as
-  that person.
-- **🧪 Browse the cast** — Lens introspects the app's `/.cratis/commands` and `/.cratis/queries` endpoints and
-  lists every command and query, grouped by namespace; fill in parameters, fire it, and read the response
-  inline.
-- **🔧 Check the frame** — the current tenant, user, and identity context are always visible at a glance.
+1. Open **Settings** to inspect the Users and Tenants lists. Use their refresh controls to request entries from the detected backend, or add entries for your development scenario.
+2. Open **Context** and choose the active user and tenant. The selection is saved for this browser profile; changing it reloads matching application tabs.
+3. Open **Queries**, choose a query from the namespace tree, supply any route parameters, and perform it. Read the response in the result panel before changing context and comparing the next result.
 
-Nothing about your frontend changes — Lens injects at the network boundary, transparently, only while the
-extension is active.
+If Commands or Queries is disabled, return to the application tab and use the popup's Arc detection status control to retry. If detection succeeds but a catalog request fails, inspect that request in browser developer tools: discovery access and the selected context are separate concerns. For commands, check the payload form before executing; without a schema, Lens sends an empty payload object.
 
 ## 🧠 How it works — header injection at the boundary
 
-When the extension is active, Lens rewrites the requests your web app makes, adding the headers your backend
-already expects. Your code is none the wiser:
+Lens has two request paths. The popup adds selected context headers when it executes a command or performs a query. The background service worker also installs browser rules for matching application XHR/fetch requests, using the detected page host or backend host to scope them. With no usable host scope, it installs no rules:
 
 ```mermaid
 flowchart LR
     You["🧑‍💻 you<br/>in the browser"] -->|"HTTP request"| Lens{{"🔍 Lens<br/>injects headers"}}
     Ctx["🏢 tenant · 👤 user<br/>chosen in the popup"] -.->|"identity + tenancy<br/>headers"| Lens
-    Lens -->|"tenant-scoped,<br/>authenticated request"| Arc["⚙️ your Cratis Arc<br/>backend"]
+    Lens -->|"request with selected<br/>context headers"| Arc["⚙️ your Cratis Arc<br/>backend"]
     Arc -->|"command / query result"| You
 ```
 
-- **Identity headers** — when you select a user, Lens injects the context, claims, and permissions your backend
-  reads for authorization, following the
+- **Identity headers** — Lens sends the selected user's identity and claims as forwarded headers. The host's authentication and authorization configuration decides what to accept; the popup cannot grant permissions. See the
   [Cratis Arc authentication specification](https://www.cratis.io/arc/backend/core/authentication/#microsoft-identity-platform-azure).
-- **Tenancy headers** — when you select a tenant, Lens injects the tenant identifier that routes the request to
-  the right partition, following the
+- **Tenancy headers** — Lens sends the selected tenant identifier under `x-cratis-tenant-id` by default. Your application must resolve tenancy from the corresponding header; choosing a tenant does not establish access to it. See the
   [Cratis Arc tenancy resolvers specification](https://www.cratis.io/arc/backend/tenancy/resolvers/).
-- **Automatic propagation** — the headers ride along on command execution, query requests, and any HTTP call
-  your app makes, so the backend always receives a properly authenticated, tenant-scoped request.
-- **A clean cut on every switch** — headers alone don't change who you are once the backend has issued a
-  session. Changing the active user or tenant clears the Arc `.cratis-identity` cookie on the configured
-  origins and reloads the matching tabs, so the next request is authenticated as the person you just picked.
+
+The browser rules select the XMLHttpRequest resource type. Inspect an observable-query transport's actual request before assuming that it carries the selected context. The popup's command and query catalog requests are separate fetches that do not add selected context headers. A working query request therefore does not establish that discovery or an observable-query transport uses the same context.
+
+Changing the active user or tenant removes the Arc `.cratis-identity` cookie on the configured origins and reloads matching tabs. That cookie is legacy in current .NET Arc; its removal is not proof of a new authenticated session. The reload also clears the frontend's in-memory identity. For .NET Arc hosts that expose `/.cratis/me`, inspect that response in the application's network traffic after the reload to check the identity the host reports, rather than relying on the popup selection.
 
 ## ✨ Features at a glance
 
 | Feature | Purpose |
 | --- | --- |
-| **🏢 Tenant Selector** | Switch tenants instantly; the tenancy header is auto-injected |
-| **👤 User Selector** | Simulate different users; identity, claims, and permissions follow |
-| **🔌 Arc Development Sources** | Point Lens at a local or remote Cratis Arc backend |
-| **🧪 Command Explorer** | Browse and execute backend commands with real parameters |
+| **🏢 Tenant Selector** | Select the tenant header value for matching requests |
+| **👤 User Selector** | Select the identity and claims to send with requests |
+| **🔌 Arc Development Sources** | Refresh user and tenant lists from the detected backend |
+| **🧪 Command Explorer** | Execute commands; payload fields appear when Lens finds a schema |
 | **🧪 Query Explorer** | Run queries and inspect the payloads that come back |
-| **📈 Query Diagnostics** | Watch live observable-query health, transport, multiplexer and cache state |
+| **📈 Query Diagnostics** | Inspect snapshots when the page exposes observable-query diagnostics |
 | **🔧 Context View** | See the current tenant, user, and identity context |
 
 ## 🚀 Quick start
 
-Build the extension and load it into Chrome:
+Have Node.js, Yarn and a running local Arc application ready. Build the extension first; the build produces the directory Chrome loads, but does not install it:
 
 ```bash
 cd Source
@@ -112,12 +94,11 @@ Then, in Chrome:
 2. Enable **Developer mode**
 3. Click **Load unpacked** and select the `Source/dist` folder
 
-Now open your Cratis Arc app in the browser, open the Lens popup once so it detects the Arc context, then use
-**Settings** to add your **Arc Development Sources** (local or remote endpoints) and set up the users and
-tenants for your scenarios. The full walkthrough — including watch-mode development and release publishing — is
-in [`Documentation/GettingStarted`](Documentation/GettingStarted/index.md).
+Chrome should now list **Cratis Lens**. Open your local Arc application and then the Lens popup from that tab so detection can supply the backend address. Settings manages the user and tenant lists; Context chooses which entries to use. Follow the session above to inspect a query and its response.
 
-For active development with hot reload:
+For the build-and-load walkthrough and its prerequisites, continue with Local Development under [`Documentation/GettingStarted`](Documentation/GettingStarted/index.md). That index also links the user/tenant guide; publishing is a separate task, not a step required to use Lens locally.
+
+If you are changing Lens itself, use the watcher and reload the extension after each rebuild:
 
 ```bash
 cd Source
