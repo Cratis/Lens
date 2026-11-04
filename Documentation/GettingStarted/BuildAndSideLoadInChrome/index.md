@@ -1,6 +1,6 @@
 # Build and Side Load in Chrome
 
-Use this tutorial to build Lens and load it as an unpacked Chrome extension.
+Build Lens from this repository and load the generated directory into Chrome. You will then open the popup to check that the extension is available, before connecting it to an Arc application.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ Use this tutorial to build Lens and load it as an unpacked Chrome extension.
 
 ## 1. Install dependencies
 
-From the repository root:
+The extension package lives in the Source directory. From the repository root, move into that directory and install its dependencies:
 
 ```bash
 cd Source
@@ -19,36 +19,39 @@ yarn
 
 ## 2. Build the extension
 
-Build the production bundle:
+After dependency installation finishes without errors, keep the terminal in the Source directory for the remaining commands. Build the bundle Chrome will load:
 
 ```bash
 yarn build
 ```
 
-This creates `Source/dist/`, including the generated `manifest.json`
-and bundled assets.
+The build writes `Source/dist/`, including the generated `manifest.json` and bundled assets. Choose this generated directory in Chrome, not the source files or a release package. If the manifest is missing, return to the terminal and check that the build completed before trying to load the directory.
 
 ## 3. Open the Chrome extensions page
 
+Building Lens does not install it in Chrome. Use Chrome's unpacked-extension flow to load the generated directory:
+
 1. Open `chrome://extensions`.
 2. Enable **Developer mode**.
+
+Keep this page available for the reload step below.
 
 ## 4. Side load the extension
 
 1. Select **Load unpacked**.
 2. Choose the `Source/dist` folder.
 
-Chrome loads **Lens - Cratis Developer Tools** as an unpacked extension.
+Chrome should list **Cratis Lens** as an unpacked extension. Open its popup from Chrome's extension toolbar and look for the **Lens** heading with **Context** and **Settings** in the navigation.
 
 ## 5. Reload after changes
 
-If you change source files, rebuild and reload:
+When you edit Lens source, rebuild the generated directory first. Chrome still needs a separate Reload action to use that build:
 
 ```bash
 yarn build
 ```
 
-Then use the **Reload** action for Lens on `chrome://extensions`.
+Then use the **Reload** action for Lens on `chrome://extensions` and reopen the popup to inspect your change. If the popup still appears unchanged, check that the rebuild completed and that you reloaded the entry loaded from the generated directory in step 2.
 
-For faster iteration during development, use
-[Local Development](../LocalDevelopment/index.md) with watch mode.
+For watch mode or to connect Lens to a running Arc application, continue with
+[Local Development](../LocalDevelopment/index.md). If Commands or Queries is disabled in the popup, follow that guide to open Lens on the application tab: those views depend on page detection, which loading the extension alone does not establish.
