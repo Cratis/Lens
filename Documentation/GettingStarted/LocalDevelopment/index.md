@@ -3,7 +3,7 @@ title: Build and load Cratis Lens locally
 description: Build the Cratis Lens extension with Yarn, load it unpacked in Chrome, open it on your Arc application's page, and use watch mode while developing.
 ---
 
-Use this tutorial to run Lens locally and connect it to your Arc backend.
+To use Cratis Lens with your local Arc application, first build and load the extension. Then open its popup from the application's tab so Lens can look for Arc context on that page.
 
 ## Prerequisites
 
@@ -12,26 +12,28 @@ Use this tutorial to run Lens locally and connect it to your Arc backend.
 - Chrome or another Chromium-based browser
 - A running Arc application on your machine
 
+For tenant selection, this tutorial assumes your application reads the header Lens uses by default, `x-cratis-tenant-id`. Lens does not expose a tenant-header-name control in the popup.
+
 ## 1. Install dependencies
 
-From the repository root, install dependencies for the extension:
+The extension package lives in `Source/`, so start at the repository root and move into that directory to install its dependencies:
 
 ```bash
 cd Source
 yarn
 ```
 
-Yarn should install all dependencies without errors.
+When Yarn finishes without errors, keep this terminal in `Source/` for the build.
 
 ## 2. Build the extension
 
-Build the extension bundle:
+Build the bundle that Chrome will load as an unpacked extension:
 
 ```bash
 yarn build
 ```
 
-This generates `Source/dist/`, including `manifest.json`.
+The build writes `Source/dist/`, including `manifest.json`. Load this directory in the next step; the build does not install the extension in Chrome.
 
 ## 3. Load Lens in your browser
 
@@ -50,12 +52,13 @@ your extension list.
 3. Select the **Settings** tab (gear icon) in the popup.
 4. Use the **Users** and **Tenants** tabs to review the available users and tenants.
 
-Lens now uses the detected Arc context and current page location for
-command and query introspection.
+Lens looks for Arc context on the active page. When detection succeeds, the Commands and Queries views use that context's base URL, so open the popup from the application tab you want to inspect.
+
+Continue with [Tenants and Users](../TenantsAndUsers/index.md) to inspect the roster and choose a user or tenant. The remaining section is optional, for changes to Lens itself.
 
 ## 5. Use watch mode while developing
 
-Run this in `Source/` during active development:
+If you are editing Lens source, run the watcher in `Source/` instead of repeating the build command after each change:
 
 ```bash
 yarn dev
