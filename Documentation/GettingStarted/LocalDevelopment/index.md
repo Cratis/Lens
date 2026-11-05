@@ -4,7 +4,7 @@ Use this tutorial to run Lens locally and connect it to your Arc backend.
 
 ## Prerequisites
 
-- Node.js 20 or later
+- Node.js 22.12 or later, or 20.19 or later on Node.js 20
 - Yarn
 - Chrome or another Chromium-based browser
 - A running Arc application on your machine
@@ -37,16 +37,15 @@ This generates `Source/dist/`, including `manifest.json`.
 3. Select **Load unpacked**.
 4. Choose the `Source/dist` folder from this repository.
 
-The **Lens - Cratis Developer Tools** extension should now appear in
+The **Cratis Lens** extension should now appear in
 your extension list.
 
 ## 4. Open Lens on an Arc application page
 
 1. Navigate to your Arc application in Chrome.
 2. Open the Lens extension popup once on that page so Lens can detect Arc context.
-3. Open the extension options page from the extension details.
-4. Keep the default **Tenant Header Name** unless your app expects a different header.
-5. Select **Save Settings**.
+3. Select the **Settings** tab (gear icon) in the popup.
+4. Use the **Users** and **Tenants** tabs to review the available users and tenants.
 
 Lens now uses the detected Arc context and current page location for
 command and query introspection.
