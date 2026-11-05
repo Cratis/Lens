@@ -1,4 +1,7 @@
-# Lens Documentation
+---
+title: "Cratis Lens: inspect Arc commands and queries"
+description: Cratis Lens is a Chrome extension that lists the commands and queries a running Arc application exposes, so you can inspect them while developing.
+---
 
 Cratis Lens is a browser extension for exploring the commands and queries exposed by a running Cratis Arc application during development.
 

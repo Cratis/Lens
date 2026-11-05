@@ -1,4 +1,7 @@
-# Local Development
+---
+title: Build and load Cratis Lens locally
+description: Build the Cratis Lens extension with Yarn, load it unpacked in Chrome, open it on your Arc application's page, and use watch mode while developing.
+---
 
 Use this tutorial to run Lens locally and connect it to your Arc backend.
 
