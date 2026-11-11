@@ -166,78 +166,70 @@ async function throwForUnexpectedResponse(response: Response, baseUrl: string, e
     throw new Error(`${endpointName} failed (${response.status}) [${contentType}] from ${baseUrl}: ${preview}`);
 }
 
-async function fetchUsers(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<UserProfile[]> {
-    let response: Response;
-    try {
-        response = await fetchJson(baseUrl, USERS_ENDPOINT, options);
-    } catch (error) {
-        throw new Error(`Users request failed for ${baseUrl}: ${toReasonDetails(error).message ?? String(error)}`);
-    }
-
-    if (response.status === 404) {
-        return [];
-    }
-    if (!response.ok) {
-        await throwForUnexpectedResponse(response, baseUrl, 'Users endpoint');
-    }
-
-    const payload = await response.json() as unknown;
-    if (!Array.isArray(payload)) {
-        console.warn('[Lens][ArcSources] Users payload is not an array', {
-            baseUrl,
-            payloadType: typeof payload,
-        });
-        return [];
-    }
-
-    const users = payload
-        .map(mapArcUser)
-        .filter((_) : _ is UserProfile => _ !== null);
-
-    console.info('[Lens][ArcSources] Users fetched', {
-        baseUrl,
-        returnedCount: payload.length,
-        mappedCount: users.length,
-    });
-
-    return users;
+interface CollectionSource<T> {
+    plural: string;
+    path: string;
+    endpointName: string;
+    map: (value: unknown) => T | null;
 }
 
-async function fetchTenants(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<Tenant[]> {
+const usersSource: CollectionSource<UserProfile> = {
+    plural: 'Users',
+    path: USERS_ENDPOINT,
+    endpointName: 'Users endpoint',
+    map: mapArcUser,
+};
+
+const tenantsSource: CollectionSource<Tenant> = {
+    plural: 'Tenants',
+    path: TENANTS_ENDPOINT,
+    endpointName: 'Tenants endpoint',
+    map: mapArcTenant,
+};
+
+async function fetchCollection<T>(source: CollectionSource<T>, baseUrl: string, options: ArcSourceRequestOptions): Promise<T[]> {
     let response: Response;
     try {
-        response = await fetchJson(baseUrl, TENANTS_ENDPOINT, options);
+        response = await fetchJson(baseUrl, source.path, options);
     } catch (error) {
-        throw new Error(`Tenants request failed for ${baseUrl}: ${toReasonDetails(error).message ?? String(error)}`);
+        throw new Error(`${source.plural} request failed for ${baseUrl}: ${toReasonDetails(error).message ?? String(error)}`);
     }
 
     if (response.status === 404) {
         return [];
     }
     if (!response.ok) {
-        await throwForUnexpectedResponse(response, baseUrl, 'Tenants endpoint');
+        await throwForUnexpectedResponse(response, baseUrl, source.endpointName);
     }
 
     const payload = await response.json() as unknown;
     if (!Array.isArray(payload)) {
-        console.warn('[Lens][ArcSources] Tenants payload is not an array', {
+        console.warn(`[Lens][ArcSources] ${source.plural} payload is not an array`, {
             baseUrl,
             payloadType: typeof payload,
         });
         return [];
     }
 
-    const tenants = payload
-        .map(mapArcTenant)
-        .filter((_) : _ is Tenant => _ !== null);
+    const entries = payload
+        .map(source.map)
+        .filter((_): _ is T => _ !== null);
 
-    console.info('[Lens][ArcSources] Tenants fetched', {
+    console.info(`[Lens][ArcSources] ${source.plural} fetched`, {
         baseUrl,
         returnedCount: payload.length,
-        mappedCount: tenants.length,
+        mappedCount: entries.length,
     });
 
-    return tenants;
+    return entries;
+}
+
+function fetchUsers(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<UserProfile[]> {
+    return fetchCollection(usersSource, baseUrl, options);
+}
+
+function fetchTenants(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<Tenant[]> {
+    return fetchCollection(tenantsSource, baseUrl, options);
 }
 
 async function fetchIdentityDetailsSchema(baseUrl: string, options: ArcSourceRequestOptions = {}): Promise<JsonSchema | undefined> {
@@ -334,64 +326,52 @@ export async function fetchArcTenants(baseUrl: string, options: ArcSourceRequest
     }
 }
 
+interface Sourced {
+    id: string;
+    source?: string;
+}
+
+// Only a failed fetch keeps the previous arc-sourced entries. A refresh that succeeded and returned nothing
+// is a host that really has none, and must be allowed to clear them.
+function mergeSourced<T extends Sourced>(current: T[], fetched: T[], failed: boolean): T[] {
+    const customEntries = current.filter(_ => _.source !== 'arc');
+    const arcEntries = failed ? current.filter(_ => _.source === 'arc') : fetched;
+    return [...customEntries, ...arcEntries];
+}
+
+function resolveActiveId(entries: Sourced[], activeId: string): string {
+    return entries.some(_ => _.id === activeId) ? activeId : (entries[0]?.id ?? '');
+}
+
 export function mergeArcSourcedSettings(settings: ExtensionSettings, sources: ArcDevelopmentSources): ExtensionSettings {
-    const customUsers = settings.users.filter(_ => _.source !== 'arc');
-    const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
-
-    // Only a failed fetch keeps the previous entries. A refresh that succeeded and returned nothing is a
-    // host that really has no users or tenants, and must be allowed to clear them.
-    const arcUsers = sources.usersFailed ? settings.users.filter(_ => _.source === 'arc') : sources.users;
-    const arcTenants = sources.tenantsFailed ? settings.tenants.filter(_ => _.source === 'arc') : sources.tenants;
-
-    const users = [...customUsers, ...arcUsers];
-    const tenants = [...customTenants, ...arcTenants];
-
-    const activeUserId = users.some(_ => _.id === settings.activeUserId)
-        ? settings.activeUserId
-        : (users[0]?.id ?? '');
-    const activeTenantId = tenants.some(_ => _.id === settings.activeTenantId)
-        ? settings.activeTenantId
-        : (tenants[0]?.id ?? '');
+    const users = mergeSourced(settings.users, sources.users, sources.usersFailed);
+    const tenants = mergeSourced(settings.tenants, sources.tenants, sources.tenantsFailed);
 
     return {
         ...settings,
         users,
         tenants,
-        activeUserId,
-        activeTenantId,
+        activeUserId: resolveActiveId(users, settings.activeUserId),
+        activeTenantId: resolveActiveId(tenants, settings.activeTenantId),
     };
 }
 
 export function mergeArcUsers(settings: ExtensionSettings, sources: ArcUserSources): ExtensionSettings {
-    const customUsers = settings.users.filter(_ => _.source !== 'arc');
-    // Only a failed fetch keeps the previous users; a successful empty one is a host with no users.
-    const arcUsers = sources.usersFailed ? settings.users.filter(_ => _.source === 'arc') : sources.users;
-    const mergedUsers = [...customUsers, ...arcUsers];
-
-    const activeUserId = mergedUsers.some(_ => _.id === settings.activeUserId)
-        ? settings.activeUserId
-        : (mergedUsers[0]?.id ?? '');
+    const users = mergeSourced(settings.users, sources.users, sources.usersFailed);
 
     return {
         ...settings,
-        users: mergedUsers,
-        activeUserId,
+        users,
+        activeUserId: resolveActiveId(users, settings.activeUserId),
     };
 }
 
 export function mergeArcTenants(settings: ExtensionSettings, sources: ArcTenantSources): ExtensionSettings {
-    const customTenants = settings.tenants.filter(_ => _.source !== 'arc');
-    // Only a failed fetch keeps the previous tenants; a successful empty one is a host with no tenants.
-    const arcTenants = sources.tenantsFailed ? settings.tenants.filter(_ => _.source === 'arc') : sources.tenants;
-    const mergedTenants = [...customTenants, ...arcTenants];
-
-    const activeTenantId = mergedTenants.some(_ => _.id === settings.activeTenantId)
-        ? settings.activeTenantId
-        : (mergedTenants[0]?.id ?? '');
+    const tenants = mergeSourced(settings.tenants, sources.tenants, sources.tenantsFailed);
 
     return {
         ...settings,
-        tenants: mergedTenants,
-        activeTenantId,
+        tenants,
+        activeTenantId: resolveActiveId(tenants, settings.activeTenantId),
     };
 }

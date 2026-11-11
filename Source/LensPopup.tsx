@@ -27,16 +27,79 @@ import {
     mergeArcTenants,
     mergeArcUsers,
 } from './settings/arcDevelopmentSources';
+import { buildArcStatusTooltip } from './arcStatusTooltip';
+import { buildTabDefinitions, resolveActiveTab, TabDefinition } from './lensPopupTabs';
 import './lens-popup.css';
 
 type Tab = PopupTab;
 
-interface TabDefinition {
-    id: Tab;
-    label: string;
-    iconClass: string;
-    tooltip: string;
-    disabled?: boolean;
+interface PopupHeaderProps {
+    title: string;
+    showArcStatus: boolean;
+    arcStatusTooltip: string;
+    saved: boolean;
+    persistError: string | null;
+    onRefreshArcContext: () => void;
+}
+
+function PopupHeader({ title, showArcStatus, arcStatusTooltip, saved, persistError, onRefreshArcContext }: PopupHeaderProps) {
+    const [arcStatusHovered, setArcStatusHovered] = useState(false);
+
+    return (
+        <header className="options-header">
+            <img className="lens-header-logo" src="/icons/cratis-symbol-white.svg" alt="Cratis" />
+            <h1>Lens</h1>
+            <span className="header-sub">{title}</span>
+            {showArcStatus && (
+                <Button
+                    className="arc-status-trigger"
+                    text
+                    rounded
+                    aria-label="Arc detection status"
+                    tooltip={arcStatusTooltip}
+                    tooltipOptions={{ position: 'bottom', showDelay: 120, hideDelay: 80, className: 'arc-status-tooltip' }}
+                    icon={arcStatusHovered ? 'pi pi-refresh' : 'pi pi-exclamation-triangle'}
+                    onMouseEnter={() => setArcStatusHovered(true)}
+                    onMouseLeave={() => setArcStatusHovered(false)}
+                    onClick={onRefreshArcContext}
+                />
+            )}
+            {saved && <span className="saved-badge">Saved ✓</span>}
+            {persistError && (
+                <span className="persist-error-badge" role="alert" title={persistError}>
+                    <span className="pi pi-exclamation-triangle" aria-hidden="true" />
+                    Not saved
+                </span>
+            )}
+        </header>
+    );
+}
+
+interface TabNavigationProps {
+    tabs: TabDefinition[];
+    activeTab: Tab;
+    onSelect: (tab: Tab) => void;
+}
+
+function TabNavigation({ tabs, activeTab, onSelect }: TabNavigationProps) {
+    return (
+        <nav className="left-nav" aria-label="Lens views">
+            {tabs.map(tab => (
+                <Button
+                    key={tab.id}
+                    className={`lens-tab-button ${tab.id === 'settings' ? 'is-settings-tab' : ''} ${activeTab === tab.id ? 'is-active' : ''}`}
+                    rounded
+                    text
+                    aria-label={tab.label}
+                    data-pr-tooltip={tab.tooltip}
+                    disabled={tab.disabled}
+                    onClick={() => onSelect(tab.id)}
+                >
+                    <span className={`pi ${tab.iconClass}`} aria-hidden="true" />
+                </Button>
+            ))}
+        </nav>
+    );
 }
 
 export function LensPopup() {
@@ -49,7 +112,6 @@ export function LensPopup() {
     const [queriesExpandedKeys, setQueriesExpandedKeys] = useState<Record<string, boolean>>(DEFAULT_NAVIGATION_STATE.queriesExpandedKeys);
     const [queriesSelectedKey, setQueriesSelectedKey] = useState(DEFAULT_NAVIGATION_STATE.queriesSelectedKey);
     const [navigationHydrated, setNavigationHydrated] = useState(false);
-    const [arcStatusHovered, setArcStatusHovered] = useState(false);
     const [saved, setSaved] = useState(false);
     const [persistError, setPersistError] = useState<string | null>(null);
     const [identityDetailsSchema, setIdentityDetailsSchema] = useState<JsonSchema | undefined>(undefined);
@@ -290,81 +352,13 @@ export function LensPopup() {
 
     const arcBaseUrl = arcContext?.baseUrl ?? '';
 
-    const tabs = useMemo<TabDefinition[]>(() => ([
-        {
-            id: 'context',
-            label: 'Context',
-            iconClass: 'pi-users',
-            tooltip: 'Current values: choose active user and tenant for this browser profile.',
-        },
-        {
-            id: 'commands',
-            label: 'Commands',
-            iconClass: 'pi-play-circle',
-            tooltip: hasArcContext
-                ? 'Commands: browse commands by namespace and execute them with structured input.'
-                : 'Commands are available only when the active tab is an Arc application.',
-            disabled: !hasArcContext,
-        },
-        {
-            id: 'queries',
-            label: 'Queries',
-            iconClass: 'pi-search',
-            tooltip: hasArcContext
-                ? 'Queries: browse queries by namespace and perform them with tabular results.'
-                : 'Queries are available only when the active tab is an Arc application.',
-            disabled: !hasArcContext,
-        },
-        {
-            id: 'observable-query-diagnostics',
-            label: 'Query Diagnostics',
-            iconClass: 'pi-chart-line',
-            tooltip: hasArcContext
-                ? 'Observable query diagnostics: live status of active observable queries.'
-                : 'Query diagnostics are available only when the active tab is an Arc application.',
-            disabled: !hasArcContext,
-        },
-        {
-            id: 'settings',
-            label: 'Settings',
-            iconClass: 'pi-cog',
-            tooltip: 'Manage user and tenant settings used by Lens context selection.',
-        },
-    ]), [hasArcContext]);
+    const tabs = useMemo(() => buildTabDefinitions(hasArcContext), [hasArcContext]);
 
-    const resolvedActiveTab = tabs.some(tab => tab.id === activeTab && !tab.disabled)
-        ? activeTab
-        : 'context';
+    const resolvedActiveTab = resolveActiveTab(tabs, activeTab);
 
     const activeTabTitle = tabs.find(_ => _.id === resolvedActiveTab)?.label ?? 'Lens';
     const shouldShowArcStatus = !arcContextLoading && !hasArcContext;
-    const arcStatusTooltip = (() => {
-        if (!shouldShowArcStatus) {
-            return '';
-        }
-
-        const details = arcContext?.diagnostics;
-        if (!details) {
-            return 'Not an Arc application. Click to retry detection.';
-        }
-
-        const lines = [
-            'Not an Arc application. Click to retry detection.',
-            '',
-            `tabSelectionStrategy: ${details.tabSelectionStrategy}`,
-            `selectedTabId: ${details.selectedTabId ?? 'null'}`,
-            `selectedTabUrl: ${details.selectedTabUrl ?? 'null'}`,
-            `executeScriptStatus: ${details.executeScriptStatus}`,
-            `detectionMethod: ${arcContext?.detectionMethod ?? 'n/a'}`,
-            `pageOrigin: ${arcContext?.pageOrigin ?? 'null'}`,
-        ];
-
-        if (details.errorMessage) {
-            lines.push(`errorMessage: ${details.errorMessage}`);
-        }
-
-        return lines.join('\n');
-    })();
+    const arcStatusTooltip = shouldShowArcStatus ? buildArcStatusTooltip(arcContext) : '';
 
     useEffect(() => {
         if (!navigationHydrated) {
@@ -376,50 +370,17 @@ export function LensPopup() {
     return (
         <div className="lens-settings-root">
             <Tooltip target=".lens-tab-button" position="right" showDelay={120} hideDelay={80} />
-            <header className="options-header">
-                <img className="lens-header-logo" src="/icons/cratis-symbol-white.svg" alt="Cratis" />
-                <h1>Lens</h1>
-                <span className="header-sub">{activeTabTitle}</span>
-                {shouldShowArcStatus && (
-                    <Button
-                        className="arc-status-trigger"
-                        text
-                        rounded
-                        aria-label="Arc detection status"
-                        tooltip={arcStatusTooltip}
-                        tooltipOptions={{ position: 'bottom', showDelay: 120, hideDelay: 80, className: 'arc-status-tooltip' }}
-                        icon={arcStatusHovered ? 'pi pi-refresh' : 'pi pi-exclamation-triangle'}
-                        onMouseEnter={() => setArcStatusHovered(true)}
-                        onMouseLeave={() => setArcStatusHovered(false)}
-                        onClick={() => void refreshArcContext()}
-                    />
-                )}
-                {saved && <span className="saved-badge">Saved ✓</span>}
-                {persistError && (
-                    <span className="persist-error-badge" role="alert" title={persistError}>
-                        <span className="pi pi-exclamation-triangle" aria-hidden="true" />
-                        Not saved
-                    </span>
-                )}
-            </header>
+            <PopupHeader
+                title={activeTabTitle}
+                showArcStatus={shouldShowArcStatus}
+                arcStatusTooltip={arcStatusTooltip}
+                saved={saved}
+                persistError={persistError}
+                onRefreshArcContext={() => void refreshArcContext()}
+            />
 
             <div className="lens-layout">
-                <nav className="left-nav" aria-label="Lens views">
-                    {tabs.map(tab => (
-                        <Button
-                            key={tab.id}
-                            className={`lens-tab-button ${tab.id === 'settings' ? 'is-settings-tab' : ''} ${resolvedActiveTab === tab.id ? 'is-active' : ''}`}
-                            rounded
-                            text
-                            aria-label={tab.label}
-                            data-pr-tooltip={tab.tooltip}
-                            disabled={tab.disabled}
-                            onClick={() => setActiveTab(tab.id)}
-                        >
-                            <span className={`pi ${tab.iconClass}`} aria-hidden="true" />
-                        </Button>
-                    ))}
-                </nav>
+                <TabNavigation tabs={tabs} activeTab={resolvedActiveTab} onSelect={setActiveTab} />
 
                 <main className="view-panel">
                     {resolvedActiveTab === 'settings' && (

@@ -11,21 +11,88 @@ interface Props {
     isRefreshingTenants: boolean;
 }
 
-type Mode = 'list' | 'add' | 'edit';
+type Mode = 'list' | 'add' | 'edit' | 'view';
 
 function getSource(tenant: Tenant): 'custom' | 'arc' {
     return tenant.source === 'arc' ? 'arc' : 'custom';
 }
 
+function isSameTenant(first: Tenant, second: Tenant): boolean {
+    return first.id === second.id && getSource(first) === getSource(second);
+}
+
+interface HeaderProps {
+    isRefreshing: boolean;
+    onAdd: () => void;
+    onRefresh: () => void;
+}
+
+function TenantListHeader({ isRefreshing, onAdd, onRefresh }: HeaderProps) {
+    return (
+        <div className="panel-header">
+            <h3>Tenant options</h3>
+            <div className="option-item-actions">
+                <Button
+                    icon="pi pi-plus"
+                    rounded
+                    text
+                    aria-label="Add tenant"
+                    tooltip="Add tenant"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={onAdd}
+                />
+                <Button
+                    className="tree-refresh-button"
+                    icon={isRefreshing ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                    rounded
+                    text
+                    disabled={isRefreshing}
+                    aria-label="Refresh tenants from Arc"
+                    tooltip="Refresh tenants from Arc"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={onRefresh}
+                />
+            </div>
+        </div>
+    );
+}
+
+interface RowProps {
+    tenant: Tenant;
+    isActive: boolean;
+    onView: () => void;
+    onEdit: () => void;
+    onRemove: () => void;
+}
+
+function TenantRow({ tenant, isActive, onView, onEdit, onRemove }: RowProps) {
+    const isArc = getSource(tenant) === 'arc';
+
+    return (
+        <div className="option-item">
+            <div>
+                <div className="option-item-title">{tenant.name}</div>
+                <div className="option-item-subtitle">{tenant.id}</div>
+            </div>
+            <div className="option-item-actions">
+                {isActive && <Tag value="Active" severity="success" />}
+                {isArc && <Tag value="Arc" severity="info" />}
+                {isArc && <Button icon="pi pi-eye" rounded text onClick={onView} />}
+                {!isArc && <Button icon="pi pi-pencil" rounded text onClick={onEdit} />}
+                {!isArc && <Button icon="pi pi-trash" rounded text severity="danger" onClick={onRemove} />}
+            </div>
+        </div>
+    );
+}
+
 export function TenantList({ settings, onChange, onRefreshTenants, isRefreshingTenants }: Props) {
-    const [mode, setMode] = useState<Mode | 'view'>('list');
+    const [mode, setMode] = useState<Mode>('list');
     const [editTenant, setEditTenant] = useState<Tenant | null>(null);
 
     const save = (tenant: Tenant) => {
-        const source = getSource(tenant);
         const tenants = mode === 'add'
             ? [...settings.tenants, { ...tenant, source: 'custom' as const }]
-            : settings.tenants.map(_ => _.id === tenant.id && getSource(_) === source ? tenant : _);
+            : settings.tenants.map(_ => isSameTenant(_, tenant) ? tenant : _);
 
         onChange({ ...settings, tenants });
         setMode('list');
@@ -36,12 +103,17 @@ export function TenantList({ settings, onChange, onRefreshTenants, isRefreshingT
             return;
         }
 
-        const tenants = settings.tenants.filter(_ => !(_.id === tenant.id && getSource(_) === getSource(tenant)));
+        const tenants = settings.tenants.filter(_ => !isSameTenant(_, tenant));
         const activeTenantId = settings.activeTenantId === tenant.id ? '' : settings.activeTenantId;
         onChange({ ...settings, tenants, activeTenantId });
     };
 
-    if (mode === 'add' || mode === 'edit' || mode === 'view') {
+    const open = (tenant: Tenant | null, nextMode: Mode) => {
+        setEditTenant(tenant);
+        setMode(nextMode);
+    };
+
+    if (mode !== 'list') {
         return (
             <TenantForm
                 tenant={editTenant}
@@ -54,34 +126,7 @@ export function TenantList({ settings, onChange, onRefreshTenants, isRefreshingT
 
     return (
         <div className="stack-gap">
-            <div className="panel-header">
-                <h3>Tenant options</h3>
-                <div className="option-item-actions">
-                    <Button
-                        icon="pi pi-plus"
-                        rounded
-                        text
-                        aria-label="Add tenant"
-                        tooltip="Add tenant"
-                        tooltipOptions={{ position: 'left' }}
-                        onClick={() => {
-                            setEditTenant(null);
-                            setMode('add');
-                        }}
-                    />
-                    <Button
-                        className="tree-refresh-button"
-                        icon={isRefreshingTenants ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                        rounded
-                        text
-                        disabled={isRefreshingTenants}
-                        aria-label="Refresh tenants from Arc"
-                        tooltip="Refresh tenants from Arc"
-                        tooltipOptions={{ position: 'left' }}
-                        onClick={onRefreshTenants}
-                    />
-                </div>
-            </div>
+            <TenantListHeader isRefreshing={isRefreshingTenants} onAdd={() => open(null, 'add')} onRefresh={onRefreshTenants} />
 
             {settings.tenants.length === 0 && (
                 <div className="empty-state compact">
@@ -92,31 +137,14 @@ export function TenantList({ settings, onChange, onRefreshTenants, isRefreshingT
             {settings.tenants.length > 0 && (
                 <div className="option-list">
                     {settings.tenants.map(tenant => (
-                        <div className="option-item" key={`${getSource(tenant)}:${tenant.id}`}>
-                            <div>
-                                <div className="option-item-title">{tenant.name}</div>
-                                <div className="option-item-subtitle">{tenant.id}</div>
-                            </div>
-                            <div className="option-item-actions">
-                                {settings.activeTenantId === tenant.id && <Tag value="Active" severity="success" />}
-                                {getSource(tenant) === 'arc' && <Tag value="Arc" severity="info" />}
-                                {getSource(tenant) === 'arc' && (
-                                    <Button icon="pi pi-eye" rounded text onClick={() => {
-                                        setEditTenant(tenant);
-                                        setMode('view');
-                                    }} />
-                                )}
-                                {getSource(tenant) === 'custom' && (
-                                    <Button icon="pi pi-pencil" rounded text onClick={() => {
-                                        setEditTenant(tenant);
-                                        setMode('edit');
-                                    }} />
-                                )}
-                                {getSource(tenant) === 'custom' && (
-                                    <Button icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(tenant)} />
-                                )}
-                            </div>
-                        </div>
+                        <TenantRow
+                            key={`${getSource(tenant)}:${tenant.id}`}
+                            tenant={tenant}
+                            isActive={settings.activeTenantId === tenant.id}
+                            onView={() => open(tenant, 'view')}
+                            onEdit={() => open(tenant, 'edit')}
+                            onRemove={() => remove(tenant)}
+                        />
                     ))}
                 </div>
             )}

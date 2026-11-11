@@ -19,15 +19,82 @@ function getSource(user: UserProfile): 'custom' | 'arc' {
     return user.source === 'arc' ? 'arc' : 'custom';
 }
 
+function isSameUser(first: UserProfile, second: UserProfile): boolean {
+    return first.id === second.id && getSource(first) === getSource(second);
+}
+
+interface HeaderProps {
+    isRefreshing: boolean;
+    onAdd: () => void;
+    onRefresh: () => void;
+}
+
+function UserListHeader({ isRefreshing, onAdd, onRefresh }: HeaderProps) {
+    return (
+        <div className="panel-header">
+            <h3>User options</h3>
+            <div className="option-item-actions">
+                <Button
+                    icon="pi pi-plus"
+                    rounded
+                    text
+                    aria-label="Add user"
+                    tooltip="Add user"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={onAdd}
+                />
+                <Button
+                    className="tree-refresh-button"
+                    icon={isRefreshing ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
+                    rounded
+                    text
+                    disabled={isRefreshing}
+                    aria-label="Refresh users from Arc"
+                    tooltip="Refresh users from Arc"
+                    tooltipOptions={{ position: 'left' }}
+                    onClick={onRefresh}
+                />
+            </div>
+        </div>
+    );
+}
+
+interface RowProps {
+    user: UserProfile;
+    isActive: boolean;
+    onView: () => void;
+    onEdit: () => void;
+    onRemove: () => void;
+}
+
+function UserRow({ user, isActive, onView, onEdit, onRemove }: RowProps) {
+    const isArc = getSource(user) === 'arc';
+
+    return (
+        <div className="option-item">
+            <div>
+                <div className="option-item-title">{user.displayName || user.name}</div>
+                <div className="option-item-subtitle">{user.name}</div>
+            </div>
+            <div className="option-item-actions">
+                {isActive && <Tag value="Active" severity="success" />}
+                {isArc && <Tag value="Arc" severity="info" />}
+                {isArc && <Button icon="pi pi-eye" rounded text onClick={onView} />}
+                {!isArc && <Button icon="pi pi-pencil" rounded text onClick={onEdit} />}
+                {!isArc && <Button icon="pi pi-trash" rounded text severity="danger" onClick={onRemove} />}
+            </div>
+        </div>
+    );
+}
+
 export function UserList({ settings, onChange, identityDetailsSchema, onRefreshUsers, isRefreshingUsers }: Props) {
     const [mode, setMode] = useState<Mode>('list');
     const [editUser, setEditUser] = useState<UserProfile | null>(null);
 
     const save = (user: UserProfile) => {
-        const source = getSource(user);
         const users = mode === 'add'
             ? [...settings.users, { ...user, source: 'custom' as const }]
-            : settings.users.map(_ => _.id === user.id && getSource(_) === source ? user : _);
+            : settings.users.map(_ => isSameUser(_, user) ? user : _);
 
         onChange({ ...settings, users });
         setMode('list');
@@ -38,12 +105,17 @@ export function UserList({ settings, onChange, identityDetailsSchema, onRefreshU
             return;
         }
 
-        const users = settings.users.filter(_ => !(_.id === user.id && getSource(_) === getSource(user)));
+        const users = settings.users.filter(_ => !isSameUser(_, user));
         const activeUserId = settings.activeUserId === user.id ? '' : settings.activeUserId;
         onChange({ ...settings, users, activeUserId });
     };
 
-    if (mode === 'add' || mode === 'edit' || mode === 'view') {
+    const open = (user: UserProfile | null, nextMode: Mode) => {
+        setEditUser(user);
+        setMode(nextMode);
+    };
+
+    if (mode !== 'list') {
         return (
             <UserForm
                 user={editUser}
@@ -57,34 +129,7 @@ export function UserList({ settings, onChange, identityDetailsSchema, onRefreshU
 
     return (
         <div className="stack-gap">
-            <div className="panel-header">
-                <h3>User options</h3>
-                <div className="option-item-actions">
-                    <Button
-                        icon="pi pi-plus"
-                        rounded
-                        text
-                        aria-label="Add user"
-                        tooltip="Add user"
-                        tooltipOptions={{ position: 'left' }}
-                        onClick={() => {
-                            setEditUser(null);
-                            setMode('add');
-                        }}
-                    />
-                    <Button
-                        className="tree-refresh-button"
-                        icon={isRefreshingUsers ? 'pi pi-spin pi-spinner' : 'pi pi-refresh'}
-                        rounded
-                        text
-                        disabled={isRefreshingUsers}
-                        aria-label="Refresh users from Arc"
-                        tooltip="Refresh users from Arc"
-                        tooltipOptions={{ position: 'left' }}
-                        onClick={onRefreshUsers}
-                    />
-                </div>
-            </div>
+            <UserListHeader isRefreshing={isRefreshingUsers} onAdd={() => open(null, 'add')} onRefresh={onRefreshUsers} />
 
             {settings.users.length === 0 && (
                 <div className="empty-state compact">
@@ -95,31 +140,14 @@ export function UserList({ settings, onChange, identityDetailsSchema, onRefreshU
             {settings.users.length > 0 && (
                 <div className="option-list">
                     {settings.users.map(user => (
-                        <div className="option-item" key={`${getSource(user)}:${user.id}`}>
-                            <div>
-                                <div className="option-item-title">{user.displayName || user.name}</div>
-                                <div className="option-item-subtitle">{user.name}</div>
-                            </div>
-                            <div className="option-item-actions">
-                                {settings.activeUserId === user.id && <Tag value="Active" severity="success" />}
-                                {getSource(user) === 'arc' && <Tag value="Arc" severity="info" />}
-                                {getSource(user) === 'arc' && (
-                                    <Button icon="pi pi-eye" rounded text onClick={() => {
-                                        setEditUser(user);
-                                        setMode('view');
-                                    }} />
-                                )}
-                                {getSource(user) === 'custom' && (
-                                    <Button icon="pi pi-pencil" rounded text onClick={() => {
-                                        setEditUser(user);
-                                        setMode('edit');
-                                    }} />
-                                )}
-                                {getSource(user) === 'custom' && (
-                                    <Button icon="pi pi-trash" rounded text severity="danger" onClick={() => remove(user)} />
-                                )}
-                            </div>
-                        </div>
+                        <UserRow
+                            key={`${getSource(user)}:${user.id}`}
+                            user={user}
+                            isActive={settings.activeUserId === user.id}
+                            onView={() => open(user, 'view')}
+                            onEdit={() => open(user, 'edit')}
+                            onRemove={() => remove(user)}
+                        />
                     ))}
                 </div>
             )}
