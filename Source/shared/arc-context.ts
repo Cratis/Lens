@@ -151,67 +151,64 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         return arcConfigurationBaseUrlKeys.some(key => key in configuration);
     };
 
+    const isPassThrough = (value: unknown): boolean =>
+        value === null || value === undefined
+        || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+
+    function sanitizeObject(source: Record<string, unknown>, depth: number): Record<string, unknown> {
+        const output: Record<string, unknown> = {};
+        for (const [key, child] of Object.entries(source)) {
+            if (typeof child === 'function') continue;
+            output[key] = sanitize(child, depth + 1);
+        }
+        return output;
+    }
+
     function sanitize(value: unknown, depth = 0): unknown {
         if (depth > maxSanitizationDepth) return null;
-        if (value === null || value === undefined) return value;
-        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+        if (isPassThrough(value)) return value;
         if (Array.isArray(value)) return value.map(item => sanitize(item, depth + 1));
-        if (typeof value === 'object') {
-            const source = value as Record<string, unknown>;
-            const output: Record<string, unknown> = {};
-            for (const [key, child] of Object.entries(source)) {
-                if (typeof child === 'function') continue;
-                output[key] = sanitize(child, depth + 1);
-            }
-            return output;
-        }
+        if (typeof value === 'object') return sanitizeObject(value as Record<string, unknown>, depth);
         return null;
     }
 
+    const findStartNodes = (root: Record<string, unknown>): object[] => {
+        const fiberKey = Object.keys(root).find(key => key.startsWith('__reactFiber'));
+        const containerKey = Object.keys(root).find(key => key.startsWith('__reactContainer'));
+        const fiberNode = fiberKey ? root[fiberKey] : undefined;
+        const containerNode = containerKey ? root[containerKey] : undefined;
+        const current = isRecord(containerNode) ? containerNode.current : undefined;
+
+        return [fiberNode, containerNode, current].filter(isRecord);
+    };
+
+    const unvisitedNeighbours = (node: Record<string, unknown>, visited: WeakSet<object>): object[] =>
+        [node.child, node.sibling, node.return].filter(_ => isRecord(_) && !visited.has(_)) as object[];
+
     const pageOrigin = window.location.origin;
     const pagePathname = window.location.pathname;
+
+    const pathFallbackResult = (): ArcContextDetectionResult => {
+        const isArcPath = looksLikeArcApplicationPathLocal(pagePathname);
+        return {
+            isArcApplication: isArcPath,
+            baseUrl: isArcPath ? pageOrigin : null,
+            pageOrigin,
+            configuration: null,
+            detectionMethod: 'path-fallback',
+        };
+    };
+
     const root = document.getElementById('root');
     if (!root) {
-        return {
-            isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
-            baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
-            pageOrigin,
-            configuration: null,
-            detectionMethod: 'path-fallback',
-        };
+        return pathFallbackResult();
     }
 
-    const fiberKey = Object.keys(root).find(key => key.startsWith('__reactFiber'));
-    const containerKey = Object.keys(root).find(key => key.startsWith('__reactContainer'));
-    if (!fiberKey && !containerKey) {
-        return {
-            isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
-            baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
-            pageOrigin,
-            configuration: null,
-            detectionMethod: 'path-fallback',
-        };
-    }
-
+    const queue = findStartNodes(root as unknown as Record<string, unknown>);
     const visited = new WeakSet<object>();
-    const rootObject = root as unknown as Record<string, unknown>;
-    const fiberNode = fiberKey ? rootObject[fiberKey] : undefined;
-    const containerNode = containerKey ? rootObject[containerKey] : undefined;
-    const queue: object[] = [];
-    if (isRecord(fiberNode)) {
-        queue.push(fiberNode);
-    }
-    if (isRecord(containerNode)) {
-        queue.push(containerNode);
-        const current = (containerNode as Record<string, unknown>).current;
-        if (isRecord(current)) {
-            queue.push(current);
-        }
-    }
 
     while (queue.length > 0) {
-        const node = queue.pop() as Record<string, unknown> | undefined;
-        if (!node) continue;
+        const node = queue.pop() as Record<string, unknown>;
         if (visited.has(node)) continue;
         visited.add(node);
 
@@ -219,8 +216,7 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
         const contextValue = memoizedProps?.value;
 
         if (isArcContextValueLocal(contextValue)) {
-            const context = contextValue as Record<string, unknown>;
-            const configuration = sanitize(context.configuration) as Record<string, unknown> | null;
+            const configuration = sanitize(contextValue.configuration) as Record<string, unknown> | null;
             const baseUrl = getConfiguredBaseUrlLocal(configuration, pageOrigin) ?? pageOrigin;
 
             return {
@@ -232,33 +228,43 @@ function detectArcContextFromPage(): ArcContextDetectionResult {
             };
         }
 
-        const child = node.child;
-        const sibling = node.sibling;
-        const parent = node.return;
-        if (isRecord(child) && !visited.has(child)) queue.push(child);
-        if (isRecord(sibling) && !visited.has(sibling)) queue.push(sibling);
-        if (isRecord(parent) && !visited.has(parent)) queue.push(parent);
+        queue.push(...unvisitedNeighbours(node, visited));
+    }
+
+    return pathFallbackResult();
+}
+
+function createDiagnostics(activeTab: chrome.tabs.Tab | undefined, strategy: string): ArcContextDiagnostics {
+    return {
+        selectedTabId: activeTab?.id ?? null,
+        selectedTabUrl: activeTab?.url ?? null,
+        tabSelectionStrategy: strategy,
+        executeScriptStatus: 'not-run',
+        errorMessage: null,
+    };
+}
+
+// When the page could not be inspected, a URL that looks like an Arc application is still reported as one.
+function createFallbackSnapshot(arcByUrl: boolean, pageOrigin: string | null, diagnostics: ArcContextDiagnostics): ArcContextSnapshot {
+    if (!arcByUrl) {
+        return createNonArcSnapshot(pageOrigin, diagnostics);
     }
 
     return {
-        isArcApplication: looksLikeArcApplicationPathLocal(pagePathname),
-        baseUrl: looksLikeArcApplicationPathLocal(pagePathname) ? pageOrigin : null,
+        isArcApplication: true,
+        baseUrl: pageOrigin,
         pageOrigin,
         configuration: null,
         detectionMethod: 'path-fallback',
+        diagnostics,
+        capturedAt: Date.now(),
     };
 }
 
 export async function captureArcContextForActiveTab(): Promise<ArcContextSnapshot> {
     const resolution = await resolveBestTabForArcCapture();
     const activeTab = resolution.tab;
-    const diagnostics: ArcContextDiagnostics = {
-        selectedTabId: activeTab?.id ?? null,
-        selectedTabUrl: activeTab?.url ?? null,
-        tabSelectionStrategy: resolution.strategy,
-        executeScriptStatus: 'not-run',
-        errorMessage: null,
-    };
+    const diagnostics = createDiagnostics(activeTab, resolution.strategy);
 
     const pageOrigin = getOrigin(activeTab?.url);
     const arcByUrl = looksLikeArcApplicationUrl(activeTab?.url) || looksLikeLocalDevelopmentUrl(activeTab?.url);
@@ -286,18 +292,7 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
         if (!result) {
             diagnostics.executeScriptStatus = 'empty-result';
             console.info('[Lens][ArcContext] executeScript returned no result', diagnostics);
-            if (arcByUrl) {
-                return {
-                    isArcApplication: true,
-                    baseUrl: pageOrigin,
-                    pageOrigin,
-                    configuration: null,
-                    detectionMethod: 'path-fallback',
-                    diagnostics,
-                    capturedAt: Date.now(),
-                };
-            }
-            return createNonArcSnapshot(pageOrigin, diagnostics);
+            return createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics);
         }
 
         diagnostics.executeScriptStatus = 'success';
@@ -313,18 +308,7 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
         diagnostics.executeScriptStatus = 'error';
         diagnostics.errorMessage = error instanceof Error ? error.message : String(error);
         console.warn('[Lens][ArcContext] executeScript failed', diagnostics);
-        if (arcByUrl) {
-            return {
-                isArcApplication: true,
-                baseUrl: pageOrigin,
-                pageOrigin,
-                configuration: null,
-                detectionMethod: 'path-fallback',
-                diagnostics,
-                capturedAt: Date.now(),
-            };
-        }
-        return createNonArcSnapshot(pageOrigin, diagnostics);
+        return createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics);
     }
 }
 
