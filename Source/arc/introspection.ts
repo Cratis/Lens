@@ -32,6 +32,25 @@ export interface MetadataTreeLeaf<T extends IntrospectionMetadataBase> {
     metadata: T;
 }
 
+function appendChild(parent: TreeNode, child: TreeNode): void {
+    parent.children = [...(parent.children ?? []), child];
+}
+
+function createLeafNode<T extends IntrospectionMetadataBase>(item: T, leafIcon: string): TreeNode {
+    return {
+        key: `leaf:${item.type}`,
+        label: item.name,
+        data: {
+            kind: 'leaf',
+            metadata: item,
+        } as MetadataTreeLeaf<T>,
+        selectable: true,
+        icon: leafIcon,
+        leaf: true,
+        children: undefined,
+    };
+}
+
 export function buildNamespaceTree<T extends IntrospectionMetadataBase>(items: T[], leafIcon: string): TreeNode[] {
     const roots: TreeNode[] = [];
     const map = new Map<string, TreeNode>();
@@ -53,44 +72,40 @@ export function buildNamespaceTree<T extends IntrospectionMetadataBase>(items: T
         return node;
     };
 
-    for (const item of items) {
-        const namespaceParts = item.namespace.split('.').filter(Boolean);
+    // Links the node under its parent (or the roots) once, and returns it as the next parent.
+    const link = (node: TreeNode, parent: TreeNode | undefined): TreeNode => {
+        const siblings = parent ? (parent.children ?? []) : roots;
+        if (!siblings.some(_ => _.key === node.key)) {
+            if (parent) {
+                appendChild(parent, node);
+            } else {
+                roots.push(node);
+            }
+        }
+        return node;
+    };
+
+    const ensureNamespacePath = (item: IntrospectionMetadataBase): TreeNode | undefined => {
         let parentKey = '';
         let parentNode: TreeNode | undefined;
 
-        for (const part of namespaceParts) {
+        for (const part of item.namespace.split('.').filter(Boolean)) {
             const currentKey = parentKey ? `${parentKey}.${part}` : part;
-            const currentNode = ensureNode(`ns:${currentKey}`, part);
-
-            if (!parentNode) {
-                if (!roots.some(_ => _.key === currentNode.key)) {
-                    roots.push(currentNode);
-                }
-            } else if (!parentNode.children?.some(_ => _.key === currentNode.key)) {
-                parentNode.children = [...(parentNode.children ?? []), currentNode];
-            }
-
-            parentNode = currentNode;
+            parentNode = link(ensureNode(`ns:${currentKey}`, part), parentNode);
             parentKey = currentKey;
         }
 
-        const leaf: TreeNode = {
-            key: `leaf:${item.type}`,
-            label: item.name,
-            data: {
-                kind: 'leaf',
-                metadata: item,
-            } as MetadataTreeLeaf<T>,
-            selectable: true,
-            icon: leafIcon,
-            leaf: true,
-            children: undefined,
-        };
+        return parentNode;
+    };
 
-        if (!parentNode) {
-            roots.push(leaf);
+    for (const item of items) {
+        const parentNode = ensureNamespacePath(item);
+        const leaf = createLeafNode(item, leafIcon);
+
+        if (parentNode) {
+            appendChild(parentNode, leaf);
         } else {
-            parentNode.children = [...(parentNode.children ?? []), leaf];
+            roots.push(leaf);
         }
     }
 
@@ -115,6 +130,32 @@ export async function fetchQueries(baseUrl: string): Promise<QueryMetadata[]> {
     return await fetchIntrospection<QueryMetadata>(baseUrl, '/.cratis/queries');
 }
 
+function isObjectLike(value: unknown): value is object {
+    return Boolean(value) && typeof value === 'object';
+}
+
+async function fetchSchemaCandidate(endpoint: string): Promise<JsonSchema | undefined> {
+    try {
+        const response = await fetch(endpoint);
+        if (!response.ok) {
+            return undefined;
+        }
+
+        const body = await response.json() as unknown;
+        if (!isObjectLike(body)) {
+            return undefined;
+        }
+
+        if ('schema' in body && isObjectLike(body.schema)) {
+            return body.schema as JsonSchema;
+        }
+
+        return body as JsonSchema;
+    } catch {
+        return undefined;
+    }
+}
+
 export async function tryResolveSchema(baseUrl: string, type: string): Promise<JsonSchema | undefined> {
     const encodedType = encodeURIComponent(type);
     const candidates = [
@@ -125,25 +166,9 @@ export async function tryResolveSchema(baseUrl: string, type: string): Promise<J
     ];
 
     for (const candidate of candidates) {
-        const endpoint = `${baseUrl.replace(/\/$/, '')}${candidate}`;
-        try {
-            const response = await fetch(endpoint);
-            if (!response.ok) {
-                continue;
-            }
-
-            const body = await response.json() as unknown;
-            if (!body || typeof body !== 'object') {
-                continue;
-            }
-
-            if ('schema' in body && body.schema && typeof body.schema === 'object') {
-                return body.schema as JsonSchema;
-            }
-
-            return body as JsonSchema;
-        } catch {
-            continue;
+        const schema = await fetchSchemaCandidate(`${baseUrl.replace(/\/$/, '')}${candidate}`);
+        if (schema) {
+            return schema;
         }
     }
 
