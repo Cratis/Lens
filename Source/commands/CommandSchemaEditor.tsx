@@ -122,7 +122,7 @@ export function setValueAtPath(target: Record<string, unknown>, path: string, va
     return clone;
 }
 
-function ObjectField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderObjectField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     const objectValue = isPlainObject(value) ? value : {};
 
     return (
@@ -146,7 +146,7 @@ function ObjectField({ schema, value, label, path, onChange, readOnly }: SchemaF
     );
 }
 
-function BooleanField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderBooleanField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     return (
         <div className="field-block inline-field">
             <label>{label}</label>
@@ -155,7 +155,7 @@ function BooleanField({ value, label, path, onChange, readOnly }: SchemaFieldEdi
     );
 }
 
-function NumberField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderNumberField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     return (
         <div className="field-block">
             <label>{label}</label>
@@ -169,7 +169,7 @@ function NumberField({ value, label, path, onChange, readOnly }: SchemaFieldEdit
     );
 }
 
-function ArrayField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderArrayField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     const itemType = schema?.items?.type;
     return (
         <div className="field-block">
@@ -183,7 +183,7 @@ function ArrayField({ schema, value, label, path, onChange, readOnly }: SchemaFi
     );
 }
 
-function EnumField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderEnumField({ schema, value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     return (
         <div className="field-block">
             <label>{label}</label>
@@ -202,7 +202,7 @@ function EnumField({ schema, value, label, path, onChange, readOnly }: SchemaFie
     );
 }
 
-function TextField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
+function renderTextField({ value, label, path, onChange, readOnly }: SchemaFieldEditorProps) {
     return (
         <div className="field-block">
             <label>{label}</label>
@@ -212,22 +212,23 @@ function TextField({ value, label, path, onChange, readOnly }: SchemaFieldEditor
 }
 
 const fieldsByType = new Map<string, (props: SchemaFieldEditorProps) => JSX.Element>([
-    ['object', ObjectField],
-    ['boolean', BooleanField],
-    ['number', NumberField],
-    ['integer', NumberField],
-    ['array', ArrayField],
+    ['object', renderObjectField],
+    ['boolean', renderBooleanField],
+    ['number', renderNumberField],
+    ['integer', renderNumberField],
+    ['array', renderArrayField],
 ]);
 
+// These are plain render functions rather than components, so the element tree keeps the original
+// structure: switching schema type must not remount the inputs.
 function fieldFor(schema?: JsonSchema): (props: SchemaFieldEditorProps) => JSX.Element {
     const typed = fieldsByType.get(getSchemaType(schema));
     if (typed) {
         return typed;
     }
-    return (schema?.enum?.length ?? 0) > 0 ? EnumField : TextField;
+    return (schema?.enum?.length ?? 0) > 0 ? renderEnumField : renderTextField;
 }
 
 export function CommandSchemaEditor({ schema, value, label, path, onChange, readOnly = false }: SchemaFieldEditorProps) {
-    const Field = fieldFor(schema);
-    return <Field schema={schema} value={value} label={label} path={path} onChange={onChange} readOnly={readOnly} />;
+    return fieldFor(schema)({ schema, value, label, path, onChange, readOnly });
 }

@@ -53,7 +53,9 @@ describe('when rendering a schema whose type is a list', () => {
     });
 
     it('should render an integer type as a number field', () => {
-        render({ type: ['string', 'integer'] } as unknown as JsonSchema, 5).should.contain('value="5"');
+        const markup = render({ type: ['string', 'integer'] } as unknown as JsonSchema, 5);
+        markup.should.contain('p-inputnumber');
+        markup.should.contain('value="5"');
     });
 
     it('should render a string type as text', () => {
@@ -73,11 +75,15 @@ describe('when rendering a boolean schema', () => {
 
 describe('when rendering a number schema', () => {
     it('should render the numeric value', () => {
-        render({ type: 'number' }, 12).should.contain('value="12"');
+        const markup = render({ type: 'number' }, 12);
+        markup.should.contain('p-inputnumber');
+        markup.should.contain('value="12"');
     });
 
     it('should default a missing value to zero', () => {
-        render({ type: 'integer' }, undefined).should.contain('value="0"');
+        const markup = render({ type: 'integer' }, undefined);
+        markup.should.contain('p-inputnumber');
+        markup.should.contain('value="0"');
     });
 });
 
