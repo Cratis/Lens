@@ -7,63 +7,65 @@ export interface QueryExecutionViewModel {
     data?: unknown;
 }
 
-export function parseQueryResult(raw: unknown, statusCode: number): QueryExecutionViewModel {
-    const maybe = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw as Record<string, unknown> : {};
-    const messages = [
+const wrapperProperties = ['data', 'result', 'items', 'results', 'value', 'payload', 'content'];
+const textProperties = ['message', 'title', 'detail'];
+
+function asRecord(raw: unknown): Record<string, unknown> {
+    return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw as Record<string, unknown> : {};
+}
+
+function nonBlank(value: unknown): string[] {
+    return typeof value === 'string' && value.trim().length > 0 ? [value.trim()] : [];
+}
+
+function collectMessages(raw: unknown, maybe: Record<string, unknown>): string[] {
+    const listed = [
         ...(Array.isArray(maybe.exceptionMessages) ? maybe.exceptionMessages : []),
         ...(Array.isArray(maybe.errors) ? maybe.errors : []),
     ].filter(_ => typeof _ === 'string') as string[];
 
-    if (typeof raw === 'string' && raw.trim().length > 0) {
-        messages.push(raw.trim());
+    const messages = [
+        ...listed,
+        ...nonBlank(raw),
+        ...textProperties.flatMap(property => nonBlank(maybe[property])),
+    ];
+
+    return [...new Set(messages)];
+}
+
+function extractData(raw: unknown, maybe: Record<string, unknown>): unknown {
+    if (Array.isArray(raw)) {
+        return raw;
     }
 
-    if (typeof maybe.message === 'string' && maybe.message.trim().length > 0) {
-        messages.push(maybe.message.trim());
+    if (raw !== null && typeof raw !== 'object') {
+        return raw;
     }
 
-    if (typeof maybe.title === 'string' && maybe.title.trim().length > 0) {
-        messages.push(maybe.title.trim());
+    const direct = wrapperProperties.reduce<unknown>((found, property) => found ?? maybe[property], undefined);
+    if (direct !== undefined) {
+        return direct;
     }
 
-    if (typeof maybe.detail === 'string' && maybe.detail.trim().length > 0) {
-        messages.push(maybe.detail.trim());
-    }
+    // If the response object itself looks like a row, use it directly.
+    return Object.keys(maybe).length > 0 ? raw : undefined;
+}
 
-    const distinctMessages = [...new Set(messages)];
-
-    const data = (() => {
-        if (Array.isArray(raw)) {
-            return raw;
-        }
-
-        if (raw !== null && typeof raw !== 'object') {
-            return raw;
-        }
-
-        const direct = maybe.data ?? maybe.result ?? maybe.items ?? maybe.results ?? maybe.value ?? maybe.payload ?? maybe.content;
-        if (direct !== undefined) {
-            return direct;
-        }
-
-        // If the response object itself looks like a row, use it directly.
-        if (Object.keys(maybe).length > 0) {
-            return raw;
-        }
-
-        return undefined;
-    })();
-
+function resolveSuccess(maybe: Record<string, unknown>, statusCode: number): boolean {
     const typedResult = maybe as Partial<QueryResult<unknown>>;
-    const isSuccess = typeof typedResult.isSuccess === 'boolean'
+    return typeof typedResult.isSuccess === 'boolean'
         ? typedResult.isSuccess
         : statusCode >= 200 && statusCode < 300;
+}
+
+export function parseQueryResult(raw: unknown, statusCode: number): QueryExecutionViewModel {
+    const maybe = asRecord(raw);
 
     return {
         statusCode,
-        isSuccess,
-        messages: distinctMessages,
-        data,
+        isSuccess: resolveSuccess(maybe, statusCode),
+        messages: collectMessages(raw, maybe),
+        data: extractData(raw, maybe),
     };
 }
 
