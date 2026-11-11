@@ -3,6 +3,15 @@ import { aTenant, aUser, settingsWith } from '../../testing/chromeStub';
 import { ExtensionSettings } from '../../shared/types';
 import { mergeArcSourcedSettings, mergeArcTenants, mergeArcUsers } from '../arcDevelopmentSources';
 
+function aSettingsWithOneOfEach(): ExtensionSettings {
+    return settingsWith({
+        users: [aUser()],
+        tenants: [aTenant()],
+        activeUserId: 'user-1',
+        activeTenantId: 'tenant-1',
+    });
+}
+
 // A rejected fetch and a host with nothing on it both produce an empty list, so the merge is told which
 // happened. Getting this wrong in either direction is a real bug: treat a failure as empty and an
 // unreachable host wipes the roster along with the active selection; treat empty as a failure and a host
@@ -12,12 +21,7 @@ describe('when a full refresh fails', () => {
 
     beforeEach(() => {
         merged = mergeArcSourcedSettings(
-            settingsWith({
-                users: [aUser()],
-                tenants: [aTenant()],
-                activeUserId: 'user-1',
-                activeTenantId: 'tenant-1',
-            }),
+            aSettingsWithOneOfEach(),
             { users: [], tenants: [], usersFailed: true, tenantsFailed: true });
     });
 
@@ -40,12 +44,7 @@ describe('when a full refresh succeeds and the host has nothing', () => {
 
     beforeEach(() => {
         merged = mergeArcSourcedSettings(
-            settingsWith({
-                users: [aUser()],
-                tenants: [aTenant()],
-                activeUserId: 'user-1',
-                activeTenantId: 'tenant-1',
-            }),
+            aSettingsWithOneOfEach(),
             { users: [], tenants: [], usersFailed: false, tenantsFailed: false });
     });
 
@@ -68,12 +67,7 @@ describe('when only the users fetch fails', () => {
 
     beforeEach(() => {
         merged = mergeArcSourcedSettings(
-            settingsWith({
-                users: [aUser()],
-                tenants: [aTenant()],
-                activeUserId: 'user-1',
-                activeTenantId: 'tenant-1',
-            }),
+            aSettingsWithOneOfEach(),
             { users: [], tenants: [], usersFailed: true, tenantsFailed: false });
     });
 
