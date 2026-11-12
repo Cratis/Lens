@@ -59,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Release
         id: release
@@ -76,14 +76,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 23.x
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: yarn-cache
         with:
           path: |
@@ -109,7 +109,7 @@ jobs:
         run: yarn build
 
       - name: Upload extension artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: extension-dist
           path: Source/dist/
@@ -123,7 +123,7 @@ jobs:
 
     steps:
       - name: Download extension artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-dist
           path: dist/
@@ -132,7 +132,7 @@ jobs:
         run: cd dist && zip -r ../extension-chrome.zip .
 
       - name: Publish to Chrome Web Store
-        uses: mnao305/chrome-extension-upload@v5.0.0
+        uses: mnao305/chrome-extension-upload@v7.0.0
         with:
           file-path: extension-chrome.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
@@ -148,7 +148,7 @@ jobs:
 
     steps:
       - name: Download extension artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-dist
           path: dist/
@@ -173,17 +173,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 23.x
 
       # No dependency install here: web-ext is not a project dependency, npx fetches it on demand,
       # and this job only signs the already-built artifact.
       - name: Download extension artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-dist
           path: Source/dist/
@@ -206,11 +206,11 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Safari packaging is pure Xcode tooling against the built artifact -- no Node, no dependencies.
       - name: Download extension artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: extension-dist
           path: Source/dist/
