@@ -1,0 +1,107 @@
+.lens-availability {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+    height: 100%;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+.lens-availability-toolbar {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.lens-availability-heading {
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+    color: var(--text-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.lens-availability-empty {
+    margin: 0;
+    color: var(--text-color-secondary);
+}
+
+.lens-availability-audiences {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.lens-availability-audience,
+.lens-availability-node {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+    width: 100%;
+}
+
+.lens-availability-audience-name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.lens-availability-audience-name small {
+    color: var(--text-color-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lens-availability-node-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.lens-availability-node.is-off .lens-availability-node-label {
+    color: var(--text-color-secondary);
+    text-decoration: line-through;
+}
+
+.lens-availability-node.is-on .lens-availability-node-label > .pi {
+    color: var(--green-500, #22c55e);
+}
+
+.lens-availability-parts,
+.lens-availability-inherited {
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+}
+
+.lens-availability-parts {
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: var(--surface-hover);
+}
+
+.lens-availability-switch .p-button {
+    padding: 0.2rem 0.55rem;
+    font-size: 0.8rem;
+}
+
+.lens-availability-tree.p-tree {
+    border: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.lens-availability-tree .p-treenode-content {
+    width: 100%;
+}
+
+.lens-availability-tree .p-treenode-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}

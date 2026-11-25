@@ -75,6 +75,7 @@ Changing the active user or tenant removes the Arc `.cratis-identity` cookie on 
 | **🔌 Arc Development Sources** | Refresh user and tenant lists from the detected backend |
 | **🧪 Command Explorer** | Execute commands; payload fields appear when Lens finds a schema |
 | **🧪 Query Explorer** | Run queries and inspect the payloads that come back |
+| **🎚️ Availability** | Switch audiences, modules, features and slices on or off in a running app (Development only) and watch the page follow, without a reload |
 | **📈 Query Diagnostics** | Inspect snapshots when the page exposes observable-query diagnostics |
 | **🔧 Context View** | See the current tenant, user, and identity context |
 
@@ -116,6 +117,7 @@ Source/
 ├── background/             # service worker that injects headers
 ├── commands/               # command explorer
 ├── queries/                # query explorer
+├── availability/           # audience, feature and slice switches
 ├── observable-query-diagnostics/  # live observable-query health
 ├── settings/               # configuration, tenant/user management
 ├── context/                # identity and tenancy context

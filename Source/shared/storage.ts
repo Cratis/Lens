@@ -1,6 +1,6 @@
 import { ExtensionSettings, UserProfile, Tenant } from './types';
 
-export type PopupTab = 'settings' | 'context' | 'commands' | 'queries' | 'observable-query-diagnostics';
+export type PopupTab = 'settings' | 'context' | 'commands' | 'queries' | 'availability' | 'observable-query-diagnostics';
 
 export interface ExtensionNavigationState {
     activeTab: PopupTab;

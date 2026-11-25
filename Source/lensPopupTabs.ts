@@ -41,6 +41,16 @@ export function buildTabDefinitions(hasArcContext: boolean): TabDefinition[] {
             disabled: !hasArcContext,
         },
         {
+            id: 'availability',
+            label: 'Availability',
+            iconClass: 'pi-sliders-h',
+            tooltip: arcOnlyTooltip(
+                hasArcContext,
+                'Availability: switch audiences, modules, features and slices on or off and watch the application follow.',
+                'Availability is available only when the active tab is an Arc application.'),
+            disabled: !hasArcContext,
+        },
+        {
             id: 'observable-query-diagnostics',
             label: 'Query Diagnostics',
             iconClass: 'pi-chart-line',
