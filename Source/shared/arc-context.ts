@@ -1,11 +1,12 @@
 import { isInspectablePageUrl, resolveBestTabForArcCapture } from './activeTab';
+import { probeArcApplication } from './arcProbe';
 
 export interface ArcContextSnapshot {
     isArcApplication: boolean;
     baseUrl: string | null;
     pageOrigin: string | null;
     configuration: Record<string, unknown> | null;
-    detectionMethod?: 'context' | 'path-fallback';
+    detectionMethod?: 'context' | 'path-fallback' | 'probe';
     diagnostics?: ArcContextDiagnostics;
     capturedAt: number;
 }
@@ -261,6 +262,17 @@ function createFallbackSnapshot(arcByUrl: boolean, pageOrigin: string | null, di
     };
 }
 
+// React discovery finds applications whose frontend provides the Arc context. Any other page may still be
+// served by an Arc host, so ask the origin for the discovery routes every Arc host serves.
+async function probeWhenNotDetected(snapshot: ArcContextSnapshot): Promise<ArcContextSnapshot> {
+    if (snapshot.isArcApplication || !await probeArcApplication(snapshot.pageOrigin)) {
+        return snapshot;
+    }
+
+    console.info('[Lens][ArcContext] Found Arc discovery routes on the page origin', snapshot.pageOrigin);
+    return { ...snapshot, isArcApplication: true, baseUrl: snapshot.pageOrigin, detectionMethod: 'probe' };
+}
+
 export async function captureArcContextForActiveTab(): Promise<ArcContextSnapshot> {
     const resolution = await resolveBestTabForArcCapture();
     const activeTab = resolution.tab;
@@ -292,7 +304,7 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
         if (!result) {
             diagnostics.executeScriptStatus = 'empty-result';
             console.info('[Lens][ArcContext] executeScript returned no result', diagnostics);
-            return createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics);
+            return await probeWhenNotDetected(createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics));
         }
 
         diagnostics.executeScriptStatus = 'success';
@@ -303,12 +315,12 @@ export async function captureArcContextForActiveTab(): Promise<ArcContextSnapsho
             detectionMethod: result.detectionMethod,
         });
 
-        return toSnapshot(result, diagnostics);
+        return await probeWhenNotDetected(toSnapshot(result, diagnostics));
     } catch (error) {
         diagnostics.executeScriptStatus = 'error';
         diagnostics.errorMessage = error instanceof Error ? error.message : String(error);
         console.warn('[Lens][ArcContext] executeScript failed', diagnostics);
-        return createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics);
+        return await probeWhenNotDetected(createFallbackSnapshot(arcByUrl, pageOrigin, diagnostics));
     }
 }
 

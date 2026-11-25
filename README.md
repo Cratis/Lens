@@ -37,7 +37,7 @@ Three reasons, and they all line up:
 
 ## 🎥 What a session looks like
 
-After loading Lens, open its toolbar popup from your application's tab. Lens looks for the page's Arc context and uses the detected base URL to load `/.cratis/commands` and `/.cratis/queries`. A detected page enables the explorers; it does not prove that the backend endpoints are reachable or accept the selected identity.
+After loading Lens, open its toolbar popup from your application's tab. Lens looks for the page's Arc context, which a React frontend provides, and uses the detected base URL to load `/.cratis/commands` and `/.cratis/queries`. When the page has no Arc context, as with Blazor, Razor or Phoenix LiveView hosts, Lens asks the page's origin for those same routes and recognizes the application when they answer with a list, so any Arc host is found whatever its frontend or language. A detected page enables the explorers; it does not prove that the backend endpoints are reachable or accept the selected identity.
 
 1. Open **Settings** to inspect the Users and Tenants lists. Use their refresh controls to request entries from the detected backend, or add entries for your development scenario.
 2. Open **Context** and choose the active user and tenant. The selection is saved for this browser profile; changing it reloads matching application tabs.

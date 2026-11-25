@@ -22,13 +22,24 @@ function withoutTime(snapshot: ArcContextSnapshot): Omit<ArcContextSnapshot, 'ca
     return rest;
 }
 
+function serve(routes: Record<string, unknown>) {
+    globals.fetch = async (url: string) => {
+        const path = new URL(url).pathname;
+        return path in routes
+            ? { ok: true, json: async () => routes[path] }
+            : { ok: false, json: async () => { throw new Error('not found'); } };
+    };
+}
+
 beforeEach(() => {
+    serve({});
     console.info = () => { };
     console.warn = () => { };
 });
 
 afterEach(() => {
     delete globals.chrome;
+    delete globals.fetch;
     console.info = originalInfo;
     console.warn = originalWarn;
 });
@@ -111,5 +122,36 @@ describe('when the script fails', () => {
         const snapshot = await captureArcContextForActiveTab();
         snapshot.isArcApplication.should.be.false;
         snapshot.diagnostics!.errorMessage!.should.equal('plain');
+    });
+});
+
+describe('when the page has no arc context but its origin serves the arc discovery routes', () => {
+    it('should find the application by probing the origin', async () => {
+        serve({ '/.cratis/commands': [] });
+        install({ id: 7, url: 'https://portal.test/settings' }, async () => [{ result: { isArcApplication: false, baseUrl: null, pageOrigin: 'https://portal.test', configuration: null, detectionMethod: 'path-fallback' } }]);
+        const snapshot = await captureArcContextForActiveTab();
+        snapshot.isArcApplication.should.be.true;
+        snapshot.baseUrl!.should.equal('https://portal.test');
+        snapshot.detectionMethod!.should.equal('probe');
+        snapshot.diagnostics!.executeScriptStatus.should.equal('success');
+    });
+
+    it('should find it when the script could not run', async () => {
+        serve({ '/.cratis/queries': [] });
+        install({ id: 7, url: 'https://portal.test/' }, async () => { throw new Error('denied'); });
+        const snapshot = await captureArcContextForActiveTab();
+        snapshot.isArcApplication.should.be.true;
+        snapshot.detectionMethod!.should.equal('probe');
+    });
+});
+
+describe('when the page has an arc context', () => {
+    it('should not probe the origin', async () => {
+        let probed = false;
+        globals.fetch = async () => { probed = true; return { ok: true, json: async () => [] }; };
+        const result = { isArcApplication: true, baseUrl: 'https://api.test', pageOrigin: 'https://app.test', configuration: null, detectionMethod: 'context' };
+        install({ id: 7, url: 'https://app.test/' }, async () => [{ result }]);
+        (await captureArcContextForActiveTab()).detectionMethod!.should.equal('context');
+        probed.should.be.false;
     });
 });
