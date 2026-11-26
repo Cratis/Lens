@@ -18,6 +18,7 @@ import { SettingsView } from './settings/SettingsView';
 import { ContextView } from './context/ContextView';
 import { CommandsView } from './commands/CommandsView';
 import { QueriesView } from './queries/QueriesView';
+import { AvailabilityView } from './availability/AvailabilityView';
 import { ObservableQueryDiagnosticsView } from './observable-query-diagnostics/ObservableQueryDiagnosticsView';
 import {
     fetchArcDevelopmentSources,
@@ -431,6 +432,10 @@ export function LensPopup() {
                                 });
                             }}
                         />
+                    )}
+
+                    {resolvedActiveTab === 'availability' && hasArcContext && (
+                        <AvailabilityView arcBaseUrl={arcBaseUrl} settings={settings} />
                     )}
 
                     {resolvedActiveTab === 'observable-query-diagnostics' && (
